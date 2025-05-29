@@ -129,43 +129,6 @@ class AuroraServerlessStack(Stack):
             },
         )
 
-        # Lambda Function for bucket cleanup
-        delete_s3_bucket_lambda = lambda_.Function(
-            self,
-            "DeleteS3Bucket",
-            handler="bucket_deleter.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.Code.from_asset(
-                "src/bucket_deleter",
-                bundling=BundlingOptions(
-                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
-                    command=[
-                        "bash",
-                        "-c",
-                        "pip install cfnresponse -t /asset-output && cp -au . /asset-output",
-                    ],
-                ),
-            ),
-            timeout=Duration.seconds(30),
-            role=lambda_basic_execution_role,
-            environment={"BUCKET_NAME": s3_bucket.bucket_name},
-        )
-
-        # Custom Resource to clean up bucket on delete
-        bucket_cleanup_provider = cr.Provider(
-            self,
-            "CleanupBucketProvider",
-            on_event_handler=delete_s3_bucket_lambda,
-        )
-
-        bucket_cleanup = CustomResource(
-            self,
-            "CleanupBucketOnDelete",
-            service_token=bucket_cleanup_provider.service_token,
-            properties={"BucketName": s3_bucket.bucket_name},
-        )
-        bucket_cleanup.node.add_dependency(s3_bucket)
-
         # Create VPC for Aurora
         vpc = ec2.Vpc(
             self,
@@ -198,7 +161,6 @@ class AuroraServerlessStack(Stack):
             ),
             writer=rds.ClusterInstance.serverless_v2("Writer"),
             default_database_name=database_name,
-            cluster_identifier=f"{database_name}-{self.account}",
             credentials=rds.Credentials.from_secret(db_credentials),
             removal_policy=RemovalPolicy.DESTROY,
             serverless_v2_min_capacity=0.5,  # Minimum ACU
@@ -247,22 +209,22 @@ class AuroraServerlessStack(Stack):
             },
         )
 
-        # Custom resource to run the setup Lambda
-        setup_db_provider = cr.Provider(
-            self,
-            "SetupDatabaseProvider",
-            on_event_handler=setup_pgvector_lambda,
-        )
+        # # Custom resource to run the setup Lambda
+        # setup_db_provider = cr.Provider(
+        #     self,
+        #     "SetupDatabaseProvider",
+        #     on_event_handler=setup_pgvector_lambda,
+        # )
 
-        setup_db = CustomResource(
-            self,
-            "SetupDatabase",
-            service_token=setup_db_provider.service_token,
-            properties={
-                "Timestamp": self.node.addr
-            },  # Ensure this runs on each deployment
-        )
-        setup_db.node.add_dependency(aurora_cluster)
+        # setup_db = CustomResource(
+        #     self,
+        #     "SetupDatabase",
+        #     service_token=setup_db_provider.service_token,
+        #     properties={
+        #         "Timestamp": self.node.addr
+        #     },  # Ensure this runs on each deployment
+        # )
+        # setup_db.node.add_dependency(aurora_cluster)
 
         amazon_bedrock_execution_role = iam.Role(
             self,
