@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 from aws_cdk import (
+    BundlingOptions,
     CfnOutput,
-    CfnParameter,
     CfnResource,
     CustomResource,
     Duration,
-    Fn,
     Stack,
 )
 from aws_cdk import (
@@ -18,36 +17,26 @@ from constructs import Construct
 
 
 class RagKnowledgeBaseStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        s3_bucket_arn: str,
+        s3_bucket_name: str,
+        bedrock_role_arn: str,
+        database_name: str,
+        aurora_cluster_arn: str,
+        aurora_secret_arn: str,
+        embeddings_model_id: str,
+        **kwargs,
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Parameters
-        knowledge_base_name = CfnParameter(
-            self,
-            "KnowledgeBaseName",
-            default="rag-kb",
-            description="The name of the knowledge base.",
-        ).value_as_string
-
-        knowledge_base_description = CfnParameter(
-            self,
-            "KnowledgeBaseDescription",
-            default="Answer based only on information contained in knowledge base.",
-            description="The description of the knowledge base.",
-        ).value_as_string
-
-        aoss_index_name = CfnParameter(
-            self,
-            "AOSSIndexName",
-            default="rag-readthedocs-io",
-            description="Name of the vector index in the Amazon OpenSearch Service Serverless (AOSS) collection.",
-        ).value_as_string
-
-        # Import values from other stacks
-        s3_bucket_arn = Fn.import_value("S3BucketARN")
-        s3_bucket_name = Fn.import_value("S3BucketName")
-        bedrock_kb_arn = Fn.import_value("BedrockKBARN")
-        collection_arn = Fn.import_value("CollectionARN")
+        knowledge_base_name = "rag-kb"
+        knowledge_base_description = (
+            "Answer based only on information contained in knowledge base."
+        )
 
         # Create IAM Role for Lambda custom resource
         lambda_iam_role = iam.Role(
@@ -92,7 +81,17 @@ class RagKnowledgeBaseStack(Stack):
             function_name="bucket-manager",
             handler="bucket_manager.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_12,
-            code=lambda_.Code.from_asset("../src/bucket_manager"),
+            code=lambda_.Code.from_asset(
+                "src/bucket_manager",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install cfnresponse==1.1.5 -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             role=lambda_iam_role,
             timeout=Duration.seconds(50),
         )
@@ -136,25 +135,27 @@ class RagKnowledgeBaseStack(Stack):
         # Create Knowledge Base resource
         knowledge_base = CfnResource(
             self,
-            "KnowledgeBaseWithAoss",
+            "KnowledgeBaseWithAurora",
             type="AWS::Bedrock::KnowledgeBase",
             properties={
                 "Name": knowledge_base_name,
                 "Description": knowledge_base_description,
-                "RoleArn": bedrock_kb_arn,
+                "RoleArn": bedrock_role_arn,
                 "KnowledgeBaseConfiguration": {
                     "Type": "VECTOR",
                     "VectorKnowledgeBaseConfiguration": {
-                        "EmbeddingModelArn": f"arn:{self.partition}:bedrock:{self.region}::foundation-model/amazon.titan-embed-text-v1"
+                        "EmbeddingModelArn": f"arn:{self.partition}:bedrock:{self.region}::foundation-model/{embeddings_model_id}"
                     },
                 },
                 "StorageConfiguration": {
-                    "Type": "OPENSEARCH_SERVERLESS",
-                    "OpensearchServerlessConfiguration": {
-                        "CollectionArn": collection_arn,
-                        "VectorIndexName": aoss_index_name,
-                        "FieldMapping": {
-                            "VectorField": "vector",
+                    "Type": "AURORA",
+                    "AuroraConfiguration": {
+                        "DatabaseName": database_name,
+                        "ClusterArn": aurora_cluster_arn,
+                        "Credentials": {"SecretArn": aurora_secret_arn},
+                        "TableName": "embeddings",  # The table name where vectors will be stored
+                        "VectorSchema": {
+                            "VectorField": "embedding",
                             "TextField": "text",
                             "MetadataField": "metadata",
                         },
@@ -199,7 +200,7 @@ class RagKnowledgeBaseStack(Stack):
             function_name="kbsync-function",
             handler="kb_ingestion_manager.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_12,
-            code=lambda_.Code.from_asset("../src/kb_ingestion_manager"),
+            code=lambda_.Code.from_asset("src/kb_ingestion_manager"),
             role=kb_sync_role,
             timeout=Duration.seconds(900),
             memory_size=1024,
