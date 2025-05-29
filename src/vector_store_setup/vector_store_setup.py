@@ -4,12 +4,11 @@ import os
 
 import boto3
 import cfnresponse
-import psycopg2
+import pg8000
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
 
 def get_secret(secret_name):
     client = boto3.client("secretsmanager")
@@ -19,7 +18,6 @@ def get_secret(secret_name):
     except ClientError as e:
         logger.error(f"Error retrieving secret: {e}")
         raise e
-
 
 def handler(event, context):
     try:
@@ -36,11 +34,11 @@ def handler(event, context):
             username = secret["username"]
             password = secret["password"]
 
-            # Connect to database
-            conn = psycopg2.connect(
+            # Connect to database using pg8000
+            conn = pg8000.connect(
                 host=host,
                 port=5432,
-                dbname=db_name,
+                database=db_name,
                 user=username,
                 password=password,
             )
