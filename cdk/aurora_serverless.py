@@ -1,4 +1,5 @@
 from aws_cdk import (
+    BundlingOptions,
     CustomResource,
     Duration,
     RemovalPolicy,
@@ -39,16 +40,13 @@ class AuroraServerlessStack(Stack):
     ) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Parameters
-        self.iam_user_arn = iam_user_arn
-        self.database_name = database_name
-
         # S3 Bucket for Logging
         s3_bucket_for_logging = s3.Bucket(
             self,
             "S3BucketForLogging",
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Main S3 Bucket
@@ -59,6 +57,7 @@ class AuroraServerlessStack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
             server_access_logs_bucket=s3_bucket_for_logging,
             server_access_logs_prefix="access-logs",
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # S3 Bucket Policies
@@ -136,7 +135,17 @@ class AuroraServerlessStack(Stack):
             "DeleteS3Bucket",
             handler="bucket_deleter.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.Code.from_asset("../src/bucket_deleter"),
+            code=lambda_.Code.from_asset(
+                "src/bucket_deleter",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install cfnresponse -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             timeout=Duration.seconds(30),
             role=lambda_basic_execution_role,
             environment={"BUCKET_NAME": s3_bucket.bucket_name},
@@ -176,27 +185,24 @@ class AuroraServerlessStack(Stack):
             ),
         )
 
-        # Create Aurora Serverless Cluster with minimum capacity
-        aurora_cluster = rds.ServerlessCluster(
+        # Create Aurora Serverless v2 Cluster
+        aurora_cluster = rds.DatabaseCluster(
             self,
             "AuroraServerlessCluster",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_15_3  # Latest version with pgvector support
+                version=rds.AuroraPostgresEngineVersion.VER_15_3
             ),
-            parameter_group=rds.ParameterGroup.from_parameter_group_name(
-                self, "ParameterGroup", "default.aurora-postgresql15"
-            ),
-            default_database_name=database_name.value_as_string,
             vpc=vpc,
-            scaling=rds.ServerlessScalingOptions(
-                auto_pause=Duration.minutes(
-                    5
-                ),  # Pause after 5 minutes of inactivity
-                min_capacity=rds.AuroraCapacityUnit.ACU_1,  # Minimum compute = 1 ACU
-                max_capacity=rds.AuroraCapacityUnit.ACU_2,  # Maximum compute = 2 ACU
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
             ),
+            writer=rds.ClusterInstance.serverless_v2("Writer"),
+            default_database_name=database_name,
+            cluster_identifier=f"{database_name}-{self.account}",
             credentials=rds.Credentials.from_secret(db_credentials),
-            removal_policy=RemovalPolicy.DESTROY,  # For easier cleanup in dev/test environments
+            removal_policy=RemovalPolicy.DESTROY,
+            serverless_v2_min_capacity=0.5,  # Minimum ACU
+            serverless_v2_max_capacity=1.0,  # Maximum ACU
         )
 
         # Lambda to enable pgvector extension in the database
@@ -218,16 +224,26 @@ class AuroraServerlessStack(Stack):
         setup_pgvector_lambda = lambda_.Function(
             self,
             "SetupPgvectorLambda",
-            handler="index.handler",
+            handler="vector_store_setup.handler",
             runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.Code.from_asset("../src/vector_store_setup"),
+            code=lambda_.Code.from_asset(
+                "src/vector_store_setup",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             vpc=vpc,
             timeout=Duration.minutes(5),
             role=setup_pgvector_lambda_role,
             environment={
                 "DB_SECRET_ARN": db_credentials.secret_arn,
                 "DB_HOST": aurora_cluster.cluster_endpoint.hostname,
-                "DB_NAME": database_name.value_as_string,
+                "DB_NAME": database_name,
             },
         )
 
@@ -248,29 +264,19 @@ class AuroraServerlessStack(Stack):
         )
         setup_db.node.add_dependency(aurora_cluster)
 
-        # IAM Role for Bedrock Knowledge Base to access Aurora
         amazon_bedrock_execution_role = iam.Role(
             self,
             "AmazonBedrockExecutionRoleForKnowledgeBase",
-            assumed_by=iam.ServicePrincipal("bedrock.amazonaws.com"),
-            path="/",
-        )
-
-        # Update assume role policy with conditions
-        amazon_bedrock_execution_role.assume_role_policy = iam.PolicyDocument(
-            statements=[
-                iam.PolicyStatement(
-                    effect=iam.Effect.ALLOW,
-                    principals=[iam.ServicePrincipal("bedrock.amazonaws.com")],
-                    actions=["sts:AssumeRole"],
-                    conditions={
-                        "StringEquals": {"aws:SourceAccount": self.account},
-                        "ArnLike": {
-                            "AWS:SourceArn": f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/*"
-                        },
+            assumed_by=iam.PrincipalWithConditions(
+                iam.ServicePrincipal("bedrock.amazonaws.com"),
+                conditions={
+                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "ArnLike": {
+                        "AWS:SourceArn": f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/*"
                     },
-                )
-            ]
+                },
+            ),
+            path="/",
         )
 
         # Add S3 read permissions
@@ -316,9 +322,12 @@ class AuroraServerlessStack(Stack):
         )
 
         # Store attributes for use outside the stack
-        self.bucket_arn = s3_bucket.bucket_arn
-        self.bucket_name = s3_bucket.bucket_name
+        self.s3_bucket_arn = s3_bucket.bucket_arn
+        self.s3_bucket_name = s3_bucket.bucket_name
 
+        self.iam_user_arn = iam_user_arn
+
+        self.database_name = database_name
         self.aurora_cluster_arn = aurora_cluster.cluster_arn
         self.cluster_endpoint = aurora_cluster.cluster_endpoint.hostname
         self.aurora_secret_arn = db_credentials.secret_arn
