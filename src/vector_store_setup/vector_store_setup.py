@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 def get_secret(secret_name):
     client = boto3.client("secretsmanager")
     try:
@@ -18,6 +19,7 @@ def get_secret(secret_name):
     except ClientError as e:
         logger.error(f"Error retrieving secret: {e}")
         raise e
+
 
 def handler(event, context):
     try:
@@ -44,28 +46,42 @@ def handler(event, context):
             )
             conn.autocommit = True
 
+            # Setup db for Bedrock access
             with conn.cursor() as cur:
-                # Enable pgvector extension
                 logger.info("Enabling pgvector extension")
                 cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
-                # Create vector table (if it doesn't exist)
-                logger.info("Creating vector table")
-                cur.execute("""
-                CREATE TABLE IF NOT EXISTS vector_store (
-                    id SERIAL PRIMARY KEY,
-                    text TEXT,
-                    metadata JSONB,
-                    vector VECTOR(1536)
-                );
-                """)
+                logger.info("Creating schema")
+                cur.execute("CREATE SCHEMA IF NOT EXISTS bedrock_integration;")
 
-                # Create vector index
-                logger.info("Creating vector index")
+                logger.info("Creating bedrock user role")
+                cur.execute(
+                    "CREATE ROLE bedrock_user WITH PASSWORD 'password' LOGIN;"
+                )
+
+                logger.info("Granting permissions")
+                cur.execute(
+                    "GRANT ALL ON SCHEMA bedrock_integration to bedrock_user;"
+                )
+
+                logger.info("Creating table")
                 cur.execute("""
-                CREATE INDEX IF NOT EXISTS vector_idx ON vector_store
-                USING hnsw (vector vector_cosine_ops);
-                """)
+                CREATE TABLE IF NOT EXISTS bedrock_integration.bedrock_kb (
+                    id uuid PRIMARY KEY,
+                    embedding vector(1536),
+                    chunks text,
+                    metadata json,
+                    custom_metadata jsonb
+                );""")
+
+                logger.info("Creating indexes")
+                cur.execute(
+                    """CREATE INDEX ON bedrock_integration.bedrock_kb USING hnsw (embedding vector_cosine_ops);"""
+                )
+
+                cur.execute(
+                    """CREATE INDEX ON bedrock_integration.bedrock_kb USING gin (to_tsvector('simple', chunks));"""
+                )
 
             conn.close()
             logger.info("Database setup completed successfully")
