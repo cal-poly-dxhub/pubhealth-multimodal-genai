@@ -137,6 +137,7 @@ class AuroraServerlessStack(Stack):
             nat_gateways=1,  # Minimum for outbound connectivity
         )
 
+
         # Create database credentials secret
         db_credentials = secretsmanager.Secret(
             self,
@@ -146,6 +147,26 @@ class AuroraServerlessStack(Stack):
                 generate_string_key="password",
                 exclude_punctuation=True,
             ),
+        )
+
+
+        lambda_security_group = ec2.SecurityGroup(
+            self,
+            "LambdaSecurityGroup",
+            vpc=vpc,
+            description="Security group for Lambda function"
+        )
+
+        aurora_security_group = ec2.SecurityGroup(
+            self,
+            "AuroraSecurityGroup",
+            vpc=vpc,
+            description="Security group for Aurora and Proxy"
+        )
+        aurora_security_group.add_ingress_rule(
+            peer=lambda_security_group,
+            connection=ec2.Port.tcp(5432),
+            description="Allow Lambda to connect to Database and Proxy"
         )
 
         # Create Aurora Serverless v2 Cluster
@@ -165,6 +186,19 @@ class AuroraServerlessStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             serverless_v2_min_capacity=0.5,  # Minimum ACU
             serverless_v2_max_capacity=1.0,  # Maximum ACU
+        )
+
+        # Create proxy to allow Lambda connection
+        aurora_proxy = rds.DatabaseProxy(
+            self,
+            "AuroraProxy",
+            proxy_target=rds.ProxyTarget.from_cluster(aurora_cluster),
+            vpc=vpc,
+            secrets=[db_credentials],
+            security_groups=[aurora_security_group],
+            require_tls=True,
+            idle_client_timeout=Duration.minutes(5),
+            max_connections_percent=100
         )
 
         # Lambda to enable pgvector extension in the database
@@ -200,11 +234,12 @@ class AuroraServerlessStack(Stack):
                 ),
             ),
             vpc=vpc,
+            security_groups=[lambda_security_group],
             timeout=Duration.minutes(5),
             role=setup_pgvector_lambda_role,
             environment={
                 "DB_SECRET_ARN": db_credentials.secret_arn,
-                "DB_HOST": aurora_cluster.cluster_endpoint.hostname,
+                "DB_HOST": aurora_proxy.endpoint,
                 "DB_NAME": database_name,
             },
         )
