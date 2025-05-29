@@ -27,7 +27,6 @@ class LexBotStack(Stack):
             )
         )
 
-        # Create the Lex bot
         bot = lex.CfnBot(
             self,
             "MedicaidChatBot",
@@ -36,19 +35,33 @@ class LexBotStack(Stack):
             role_arn=lex_role.role_arn,
             idle_session_ttl_in_seconds=300,
             description="Medicaid information chatbot",
-            # Bot locales configuration - this is where intents go
             bot_locales=[
                 lex.CfnBot.BotLocaleProperty(
                     locale_id="en_US",
                     nlu_confidence_threshold=0.40,
                     description="English US locale",
                     intents=[
+                        # Your existing QnAIntent
                         lex.CfnBot.IntentProperty(
                             name="QnAIntent",
                             description="Intent for Q&A functionality",
                             parent_intent_signature="AMAZON.QnAIntent",
                             fulfillment_code_hook=lex.CfnBot.FulfillmentCodeHookSettingProperty(
                                 enabled=True
+                            ),
+                            qn_a_intent_configuration=lex.CfnBot.QnAIntentConfigurationProperty(
+                                bedrock_model_configuration=lex.CfnBot.BedrockModelSpecificationProperty(
+                                    model_arn="anthropic.claude-3-5-haiku-20241022-v1:0"  # TODO
+                                ),
+                                data_source_configuration=lex.CfnBot.DataSourceConfigurationProperty(
+                                    bedrock_knowledge_store_configuration=lex.CfnBot.BedrockKnowledgeStoreConfigurationProperty(
+                                        bedrock_knowledge_base_arn="arn:aws:bedrock:us-west-2:762233745628:knowledge-base/R39NPRFNZZ",  # TODO
+                                        bkb_exact_response_fields=lex.CfnBot.BKBExactResponseFieldsProperty(
+                                            answer_field="answerField"
+                                        ),
+                                        exact_response=False,
+                                    )
+                                ),
                             ),
                             initial_response_setting=lex.CfnBot.InitialResponseSettingProperty(
                                 initial_response=lex.CfnBot.ResponseSpecificationProperty(
@@ -78,7 +91,29 @@ class LexBotStack(Stack):
                                 ),
                                 is_active=True,
                             ),
-                        )
+                        ),
+                        # Add Fallback Intent
+                        lex.CfnBot.IntentProperty(
+                            name="FallbackIntent",
+                            description="Default fallback intent",
+                            parent_intent_signature="AMAZON.FallbackIntent",
+                            initial_response_setting=lex.CfnBot.InitialResponseSettingProperty(
+                                initial_response=lex.CfnBot.ResponseSpecificationProperty(
+                                    message_groups_list=[
+                                        lex.CfnBot.MessageGroupProperty(
+                                            message=lex.CfnBot.MessageProperty(
+                                                plain_text_message=lex.CfnBot.PlainTextMessageProperty(
+                                                    value="I'm sorry, I didn't understand that. Could you please rephrase or ask something else?"
+                                                )
+                                            )
+                                        )
+                                    ]
+                                )
+                            ),
+                            fulfillment_code_hook=lex.CfnBot.FulfillmentCodeHookSettingProperty(
+                                enabled=False
+                            ),
+                        ),
                     ],
                 )
             ],
