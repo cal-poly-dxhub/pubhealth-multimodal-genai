@@ -23,8 +23,76 @@ class LexBotStack(Stack):
         # Add permissions needed by Lex
         lex_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name(
-                "AmazonLexFullAccess"
+                "AmazonLexFullAccess",
             )
+        )
+        bedrock_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+                "bedrock:InvokeModel",
+                "bedrock:Retrieve",
+                "bedrock:Query",
+                "bedrock:GetKnowledgeBase",
+            ],
+            resources=[
+                "arn:aws:bedrock:us-west-2:762233745628:knowledge-base/R39NPRFNZZ",  # TODO
+                "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",  # TODO
+            ],
+        )
+
+        qna_intent = lex.CfnBot.IntentProperty(
+            name="QnAIntent",
+            description="Intent for Q&A functionality",
+            parent_intent_signature="AMAZON.QnAIntent",
+            qn_a_intent_configuration=lex.CfnBot.QnAIntentConfigurationProperty(
+                bedrock_model_configuration=lex.CfnBot.BedrockModelSpecificationProperty(
+                    model_arn="arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"  # TODO
+                ),
+                data_source_configuration=lex.CfnBot.DataSourceConfigurationProperty(
+                    bedrock_knowledge_store_configuration=lex.CfnBot.BedrockKnowledgeStoreConfigurationProperty(
+                        bedrock_knowledge_base_arn="arn:aws:bedrock:us-west-2:762233745628:knowledge-base/R39NPRFNZZ",  # TODO
+                        bkb_exact_response_fields=lex.CfnBot.BKBExactResponseFieldsProperty(
+                            answer_field="chunks"
+                        ),
+                        exact_response=False,
+                    )
+                ),
+            ),
+            intent_closing_setting=lex.CfnBot.IntentClosingSettingProperty(
+                closing_response=lex.CfnBot.ResponseSpecificationProperty(
+                    message_groups_list=[
+                        lex.CfnBot.MessageGroupProperty(
+                            message=lex.CfnBot.MessageProperty(
+                                plain_text_message=lex.CfnBot.PlainTextMessageProperty(
+                                    value="Thank you for using the Medicaid chatbot."
+                                )
+                            )
+                        )
+                    ]
+                )
+            ),
+        )
+
+        fallback_intent = lex.CfnBot.IntentProperty(
+            name="FallbackIntent",
+            description="Default fallback intent",
+            parent_intent_signature="AMAZON.FallbackIntent",
+            initial_response_setting=lex.CfnBot.InitialResponseSettingProperty(
+                initial_response=lex.CfnBot.ResponseSpecificationProperty(
+                    message_groups_list=[
+                        lex.CfnBot.MessageGroupProperty(
+                            message=lex.CfnBot.MessageProperty(
+                                plain_text_message=lex.CfnBot.PlainTextMessageProperty(
+                                    value="I'm sorry, I didn't understand that. Could you please rephrase or ask something else?"
+                                )
+                            )
+                        )
+                    ]
+                )
+            ),
+            fulfillment_code_hook=lex.CfnBot.FulfillmentCodeHookSettingProperty(
+                enabled=False
+            ),
         )
 
         bot = lex.CfnBot(
@@ -41,79 +109,8 @@ class LexBotStack(Stack):
                     nlu_confidence_threshold=0.40,
                     description="English US locale",
                     intents=[
-                        # Your existing QnAIntent
-                        lex.CfnBot.IntentProperty(
-                            name="QnAIntent",
-                            description="Intent for Q&A functionality",
-                            parent_intent_signature="AMAZON.QnAIntent",
-                            fulfillment_code_hook=lex.CfnBot.FulfillmentCodeHookSettingProperty(
-                                enabled=True
-                            ),
-                            qn_a_intent_configuration=lex.CfnBot.QnAIntentConfigurationProperty(
-                                bedrock_model_configuration=lex.CfnBot.BedrockModelSpecificationProperty(
-                                    model_arn="anthropic.claude-3-5-haiku-20241022-v1:0"  # TODO
-                                ),
-                                data_source_configuration=lex.CfnBot.DataSourceConfigurationProperty(
-                                    bedrock_knowledge_store_configuration=lex.CfnBot.BedrockKnowledgeStoreConfigurationProperty(
-                                        bedrock_knowledge_base_arn="arn:aws:bedrock:us-west-2:762233745628:knowledge-base/R39NPRFNZZ",  # TODO
-                                        bkb_exact_response_fields=lex.CfnBot.BKBExactResponseFieldsProperty(
-                                            answer_field="answerField"
-                                        ),
-                                        exact_response=False,
-                                    )
-                                ),
-                            ),
-                            initial_response_setting=lex.CfnBot.InitialResponseSettingProperty(
-                                initial_response=lex.CfnBot.ResponseSpecificationProperty(
-                                    message_groups_list=[
-                                        lex.CfnBot.MessageGroupProperty(
-                                            message=lex.CfnBot.MessageProperty(
-                                                plain_text_message=lex.CfnBot.PlainTextMessageProperty(
-                                                    value="How can I help you today?"
-                                                )
-                                            )
-                                        )
-                                    ]
-                                )
-                            ),
-                            # Use IntentClosingSettingProperty for the closing response
-                            intent_closing_setting=lex.CfnBot.IntentClosingSettingProperty(
-                                closing_response=lex.CfnBot.ResponseSpecificationProperty(
-                                    message_groups_list=[
-                                        lex.CfnBot.MessageGroupProperty(
-                                            message=lex.CfnBot.MessageProperty(
-                                                plain_text_message=lex.CfnBot.PlainTextMessageProperty(
-                                                    value="Thank you for using the Medicaid chatbot."
-                                                )
-                                            )
-                                        )
-                                    ]
-                                ),
-                                is_active=True,
-                            ),
-                        ),
-                        # Add Fallback Intent
-                        lex.CfnBot.IntentProperty(
-                            name="FallbackIntent",
-                            description="Default fallback intent",
-                            parent_intent_signature="AMAZON.FallbackIntent",
-                            initial_response_setting=lex.CfnBot.InitialResponseSettingProperty(
-                                initial_response=lex.CfnBot.ResponseSpecificationProperty(
-                                    message_groups_list=[
-                                        lex.CfnBot.MessageGroupProperty(
-                                            message=lex.CfnBot.MessageProperty(
-                                                plain_text_message=lex.CfnBot.PlainTextMessageProperty(
-                                                    value="I'm sorry, I didn't understand that. Could you please rephrase or ask something else?"
-                                                )
-                                            )
-                                        )
-                                    ]
-                                )
-                            ),
-                            fulfillment_code_hook=lex.CfnBot.FulfillmentCodeHookSettingProperty(
-                                enabled=False
-                            ),
-                        ),
+                        qna_intent,
+                        fallback_intent,
                     ],
                 )
             ],
