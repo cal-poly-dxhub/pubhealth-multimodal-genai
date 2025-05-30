@@ -174,7 +174,7 @@ class AuroraServerlessStack(Stack):
             self,
             "AuroraServerlessCluster",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_15_3
+                version=rds.AuroraPostgresEngineVersion.VER_15_4
             ),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(
