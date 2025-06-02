@@ -8,7 +8,13 @@ from constructs import Construct
 
 class LexBotStack(Stack):
     def __init__(
-        self, scope: Construct, construct_id: str, name: str, **kwargs
+        self,
+        scope: Construct,
+        construct_id: str,
+        name: str,
+        knowledge_base_id: str,
+        chat_model_id: str,
+        **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
@@ -35,8 +41,8 @@ class LexBotStack(Stack):
                 "bedrock:GetKnowledgeBase",
             ],
             resources=[
-                "arn:aws:bedrock:us-west-2:762233745628:knowledge-base/R39NPRFNZZ",  # TODO
-                "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",  # TODO
+                f"arn:{self.partition}:bedrock:{self.region}:{self.account}:knowledge-base/{knowledge_base_id}",
+                f"arn:{self.partition}:bedrock:{self.region}::foundation-model/{chat_model_id}",
             ],
         )
 
@@ -46,11 +52,11 @@ class LexBotStack(Stack):
             parent_intent_signature="AMAZON.QnAIntent",
             qn_a_intent_configuration=lex.CfnBot.QnAIntentConfigurationProperty(
                 bedrock_model_configuration=lex.CfnBot.BedrockModelSpecificationProperty(
-                    model_arn="arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"  # TODO
+                    model_arn=f"arn:{self.partition}:bedrock:{self.region}::foundation-model/{chat_model_id}",
                 ),
                 data_source_configuration=lex.CfnBot.DataSourceConfigurationProperty(
                     bedrock_knowledge_store_configuration=lex.CfnBot.BedrockKnowledgeStoreConfigurationProperty(
-                        bedrock_knowledge_base_arn="arn:aws:bedrock:us-west-2:762233745628:knowledge-base/R39NPRFNZZ",  # TODO
+                        bedrock_knowledge_base_arn=f"arn:{self.partition}:bedrock:{self.region}:{self.account}:knowledge-base/{knowledge_base_id}",
                         bkb_exact_response_fields=lex.CfnBot.BKBExactResponseFieldsProperty(
                             answer_field="chunks"
                         ),
