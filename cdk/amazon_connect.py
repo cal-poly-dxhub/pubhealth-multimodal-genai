@@ -1,5 +1,6 @@
 # Final CDK class with all components
 from aws_cdk import (
+    BundlingOptions,
     CustomResource,
     Duration,
     RemovalPolicy,
@@ -23,7 +24,7 @@ from aws_cdk import (
 from constructs import Construct
 
 
-class ConnectInstanceStack(Stack):
+class ConnectStack(Stack):
     def __init__(
         self,
         scope: Construct,
@@ -35,6 +36,10 @@ class ConnectInstanceStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # TODO Make modular
+        inbound_calls = False
+        outbound_calls = False
+
         if environment not in ["dev", "uat", "prod"]:
             raise Exception(
                 "Please enter a valid environment value (dev, uat, prod)"
@@ -43,23 +48,26 @@ class ConnectInstanceStack(Stack):
         # Amazon Connect Instance
         connect_instance = connect.CfnInstance(
             self,
-            "AmazonConnectInstance",
+            "ConnectInstance",
             attributes=connect.CfnInstance.AttributesProperty(
-                contactflow_logs=True, inbound_calls=True, outbound_calls=True
+                contactflow_logs=True,
+                inbound_calls=inbound_calls,
+                outbound_calls=outbound_calls,
             ),
             identity_management_type="CONNECT_MANAGED",
             instance_alias=f"demoinstance-{self.stack_name}-{environment}",
         )
 
+        # TODO Reimplement phone number
         # Phone Number
-        phone_number = connect.CfnPhoneNumber(
-            self,
-            "PhoneNumber",
-            target_arn=connect_instance.attr_arn,
-            description="phone number for medicaid chat instance",
-            type="DID",
-            country_code="US",
-        )
+        # phone_number = connect.CfnPhoneNumber(
+        #     self,
+        #     "PhoneNumber",
+        #     target_arn=connect_instance.attr_arn,
+        #     description="phone number for medicaid chat instance",
+        #     type="DID",
+        #     country_code="US",
+        # )
 
         # Lambda Role for GetSecurityProfile
         get_security_profile_role = iam.Role(
@@ -89,70 +97,19 @@ class ConnectInstanceStack(Stack):
         get_security_profile_lambda = lambda_.Function(
             self,
             "LambdaFunctionGetSecurityProfile",
-            handler="index.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            code=lambda_.Code.from_inline("""
-import boto3
-import logging
-import os
-import cfnresponse
-
-client = boto3.client('connect')
-
-LOG_LEVEL = os.getenv('LOG_LEVEL')
-INSTANCE_ID = os.getenv('INSTANCE_ID')
-
-def lambda_handler(event, context):
-    global log_level
-    log_level = str(LOG_LEVEL).upper()
-    if log_level not in { 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL' }:
-      log_level = 'ERROR'
-    logging.getLogger().setLevel(log_level)
-
-    logging.info(f'Event: {event}')
-
-    request_type = event['RequestType']
-
-    if request_type == 'Delete':
-      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-      return
-
-    if request_type in {'Create', 'Update'}:
-      try:
-        security_profile_name = event['ResourceProperties']['SecurityProfileName']
-
-        marker = None
-
-        while True:
-          paginator = client.get_paginator('list_security_profiles')
-          response_iterator = paginator.paginate(
-            InstanceId=INSTANCE_ID,
-            PaginationConfig={
-              'PageSize': 10,
-              'StartingToken': marker
-            }
-          )
-          for page in response_iterator:
-            security_profiles = page['SecurityProfileSummaryList']
-            for security_profile in security_profiles:
-              if security_profile['Name'] == security_profile_name:
-                response_data = {
-                  'SecurityProfileId': security_profile['Id'],
-                  'SecurityProfileArn': security_profile['Arn'],
-                }
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
-                return
-          try:
-            marker = response_iterator['Marker']
-          except Exception as e:
-            logging.error(e)
-            cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-            break
-      except Exception as e:
-        logging.error(e)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-        return
-            """),
+            handler="get_security_profile.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            code=lambda_.Code.from_asset(
+                "src/get_security_profile",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install cfnresponse==1.1.5 -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             role=get_security_profile_role,
             memory_size=128,
             timeout=Duration.seconds(30),
@@ -206,70 +163,19 @@ def lambda_handler(event, context):
         get_routing_profile_lambda = lambda_.Function(
             self,
             "LambdaFunctionGetRoutingProfile",
-            handler="index.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            code=lambda_.Code.from_inline("""
-import boto3
-import logging
-import os
-import cfnresponse
-
-client = boto3.client('connect')
-
-LOG_LEVEL = os.getenv('LOG_LEVEL')
-INSTANCE_ID = os.getenv('INSTANCE_ID')
-
-def lambda_handler(event, context):
-    global log_level
-    log_level = str(LOG_LEVEL).upper()
-    if log_level not in { 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL' }:
-      log_level = 'ERROR'
-    logging.getLogger().setLevel(log_level)
-
-    logging.info(f'Event: {event}')
-
-    request_type = event['RequestType']
-
-    if request_type == 'Delete':
-      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-      return
-
-    if request_type in {'Create', 'Update'}:
-      try:
-        routing_profile_name = event['ResourceProperties']['RoutingProfileName']
-
-        marker = None
-
-        while True:
-          paginator = client.get_paginator('list_routing_profiles')
-          response_iterator = paginator.paginate(
-            InstanceId=INSTANCE_ID,
-            PaginationConfig={
-              'PageSize': 10,
-              'StartingToken': marker
-            }
-          )
-          for page in response_iterator:
-            routing_profiles = page['RoutingProfileSummaryList']
-            for routing_profile in routing_profiles:
-              if routing_profile['Name'] == routing_profile_name:
-                response_data = {
-                  'RoutingProfileId': routing_profile['Id'],
-                  'RoutingProfileArn': routing_profile['Arn'],
-                }
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
-                return
-          try:
-            marker = response_iterator['Marker']
-          except Exception as e:
-            logging.error(e)
-            cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-            break
-      except Exception as e:
-        logging.error(e)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-        return
-            """),
+            handler="get_routing_profile.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            code=lambda_.Code.from_asset(
+                "src/get_routing_profile",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install cfnresponse==1.1.5 -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             role=get_routing_profile_role,
             memory_size=128,
             timeout=Duration.seconds(30),
@@ -312,87 +218,19 @@ def lambda_handler(event, context):
         generate_random_string_lambda = lambda_.Function(
             self,
             "LambdaFunctionGenerateRandomString",
-            handler="index.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            code=lambda_.Code.from_inline("""
-import boto3
-import botocore
-import random
-import logging
-import os
-import cfnresponse
-import string
-
-client = boto3.client('ssm')
-
-LOG_LEVEL = os.getenv('LOG_LEVEL')
-
-def lambda_handler(event, context):
-    global log_level
-    log_level = str(LOG_LEVEL).upper()
-    if log_level not in { 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL' }:
-      log_level = 'ERROR'
-    logging.getLogger().setLevel(log_level)
-
-    logging.info(f'Event: {event}')
-
-    request_type = event['RequestType']
-
-    if request_type == 'Delete':
-      security_profile_name = event['ResourceProperties']['SecurityProfileName']
-      try:
-        response = client.delete_parameter(
-          Name=f'amazon-connect-temp-{security_profile_name}-password'
-        )
-
-        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-        return
-      except botocore.exceptions.ClientError as err:
-        if err.response['Error']['Code'] == 'ParameterNotFound':
-          cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-          return
-        else:
-          logging.error(err)
-          cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {err}'})
-          return
-      except Exception as e:
-        logging.error(e)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-        return
-
-    if request_type in {'Create', 'Update'}:
-      try:
-        string_length = event['ResourceProperties']['StringLength']
-        security_profile_name = event['ResourceProperties']['SecurityProfileName']
-
-        valid_characters = string.ascii_letters + string.digits + "!@#$%^&*_=-"
-        # First 4 specifies a mix of from each combination
-        random_string = random.SystemRandom().choice(string.ascii_lowercase)
-        random_string += random.SystemRandom().choice(string.ascii_uppercase)
-        random_string += random.SystemRandom().choice(string.digits)
-        random_string += random.SystemRandom().choice('!@#$%^&*_=-')
-
-        for i in range(int(string_length)-4):
-          random_string += random.SystemRandom().choice(valid_characters)
-
-        response = client.put_parameter(
-          Name=f'amazon-connect-temp-{security_profile_name}-password',
-          Description=f'SSM Parameter to store the temporary Amazon Connect {security_profile_name} Password',
-          Value=random_string,
-          Type='SecureString',
-          Overwrite=True,
-          Tier='Standard'
-        )
-
-        response_data = {
-          'RandomString': random_string
-        }
-        cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
-      except Exception as e:
-        logging.error(e)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-        return
-            """),
+            handler="generate_random_string.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            code=lambda_.Code.from_asset(
+                "src/generate_random_string",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install cfnresponse==1.1.5 -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             role=generate_random_string_role,
             memory_size=128,
             timeout=Duration.seconds(3),
@@ -429,13 +267,16 @@ def lambda_handler(event, context):
 
         get_contact_queue_role.add_to_policy(
             iam.PolicyStatement(
-                actions=["connect:ListQueues"],
-                resources=[
-                    f"arn:{self.partition}:connect:{self.region}:{self.account}:instance*"
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "connect:ListQueues",
+                    "connect:GetPaginator",
+                    "connect:DescribeQueue",
                 ],
-                conditions={
-                    "StringEquals": {"connect:InstanceId": connect_instance.ref}
-                },
+                resources=[
+                    f"arn:{self.partition}:connect:{self.region}:{self.account}:instance/{connect_instance.ref}/*",
+                    f"arn:{self.partition}:connect:{self.region}:{self.account}:instance/{connect_instance.ref}",
+                ],
             )
         )
 
@@ -443,72 +284,19 @@ def lambda_handler(event, context):
         get_contact_queue_lambda = lambda_.Function(
             self,
             "LambdaFunctionGetContactQueue",
-            handler="index.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            code=lambda_.Code.from_inline("""
-import boto3
-import logging
-import os
-import cfnresponse
-
-client = boto3.client('connect')
-
-LOG_LEVEL = os.getenv('LOG_LEVEL')
-INSTANCE_ID = os.getenv('INSTANCE_ID')
-
-def lambda_handler(event, context):
-    global log_level
-    log_level = str(LOG_LEVEL).upper()
-    if log_level not in { 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL' }:
-      log_level = 'ERROR'
-    logging.getLogger().setLevel(log_level)
-
-    logging.info(f'Event: {event}')
-
-    request_type = event['RequestType']
-
-    if request_type == 'Delete':
-      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-      return
-
-    if request_type in {'Create', 'Update'}:
-      try:
-        contact_queue_name = event['ResourceProperties']['ContactQueueName']
-        contact_queue_types = event['ResourceProperties']['ContactQueueTypes']
-
-        marker = None
-
-        while True:
-          paginator = client.get_paginator('list_queues')
-          response_iterator = paginator.paginate(
-            InstanceId=INSTANCE_ID,
-            QueueTypes=contact_queue_types,
-            PaginationConfig={
-              'PageSize': 10,
-              'StartingToken': marker
-            }
-          )
-          for page in response_iterator:
-            contact_queues = page['QueueSummaryList']
-            for contact_queue in contact_queues:
-              if contact_queue['Name'] == contact_queue_name:
-                response_data = {
-                  'ContactQueueId': contact_queue['Id'],
-                  'ContactQueueArn': contact_queue['Arn'],
-                }
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
-                return
-          try:
-            marker = response_iterator['Marker']
-          except Exception as e:
-            logging.error(e)
-            cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-            break
-      except Exception as e:
-        logging.error(e)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {'message': f'ERROR: {e}'})
-        return
-            """),
+            handler="get_security_profile.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            code=lambda_.Code.from_asset(
+                "src/get_security_profile",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install cfnresponse==1.1.5 -t /asset-output && cp -au . /asset-output",
+                    ],
+                ),
+            ),
             role=get_contact_queue_role,
             memory_size=128,
             timeout=Duration.seconds(30),
@@ -526,6 +314,7 @@ def lambda_handler(event, context):
             properties={
                 "ContactQueueName": "BasicQueue",
                 "ContactQueueTypes": ["STANDARD"],
+                "SecurityProfileName": "Admin",
             },
         )
 
@@ -966,7 +755,7 @@ def lambda_handler(event, context):
             "S3BucketForAccessLogging",
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,  # TODO Change to retain
         )
 
         # Add bucket policy for access logging bucket
@@ -991,7 +780,7 @@ def lambda_handler(event, context):
             encryption=s3.BucketEncryption.KMS,
             encryption_key=kms_key,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,  # TODO Change to retain
             server_access_logs_bucket=access_logging_bucket,
             server_access_logs_prefix="access-logs",
         )

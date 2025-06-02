@@ -153,7 +153,7 @@ class RagKnowledgeBaseStack(Stack):
                         "DatabaseName": database_name,
                         "ClusterArn": aurora_cluster_arn,
                         "Credentials": {"SecretArn": aurora_secret_arn},
-                        "TableName": "embeddings",  # The table name where vectors will be stored
+                        "TableName": "bedrock_integration.bedrock_kb",  # The table name where vectors will be stored
                         "VectorSchema": {
                             "VectorField": "embedding",
                             "TextField": "text",

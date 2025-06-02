@@ -1,5 +1,4 @@
 from aws_cdk import (
-    App,
     CfnOutput,
     CfnParameter,
     CustomResource,
@@ -300,21 +299,6 @@ def sendResponseCfn(event, context, responseStatus):
             f'"Principal":["{iam_user_arn.value_as_string}", "{amazon_bedrock_execution_role.role_arn}"]}}]',
         )
 
-        # Outputs
-        CfnOutput(
-            self,
-            "S3Bucket",
-            value=s3_bucket.bucket_arn,
-            export_name="S3BucketARN",
-        )
-
-        CfnOutput(
-            self,
-            "S3BucketName",
-            value=s3_bucket.bucket_name,
-            export_name="S3BucketName",
-        )
-
         CfnOutput(
             self,
             "DashboardURL",
@@ -335,12 +319,3 @@ def sendResponseCfn(event, context, responseStatus):
             value=collection.attr_arn,
             export_name="CollectionARN",
         )
-
-
-app = App()
-OpenSearchServerlessStack(
-    app,
-    "OpenSearchServerlessStack",
-    description="Template to provison Opensearch Serverless collection and S3 Bucket",
-)
-app.synth()
