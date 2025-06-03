@@ -1,11 +1,13 @@
 from aws_cdk import (
     BundlingOptions,
-    CfnOutput,
     CfnResource,
     CustomResource,
     Duration,
     RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
+    aws_bedrock as bedrock,
 )
 from aws_cdk import (
     aws_ec2 as ec2,
@@ -24,6 +26,9 @@ from aws_cdk import (
 )
 from aws_cdk import (
     aws_secretsmanager as secretsmanager,
+)
+from aws_cdk import (
+    custom_resources as cr,
 )
 from constructs import Construct
 
@@ -189,6 +194,7 @@ class AuroraKnowledgeBaseStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             serverless_v2_min_capacity=0.5,  # Minimum ACU
             serverless_v2_max_capacity=1.0,  # Maximum ACU
+            enable_data_api=True,
         )
 
         # Create proxy to allow Lambda connection
@@ -238,7 +244,7 @@ class AuroraKnowledgeBaseStack(Stack):
             ),
             vpc=vpc,
             security_groups=[lambda_security_group],
-            timeout=Duration.minutes(5),
+            timeout=Duration.minutes(15),
             role=setup_pgvector_lambda_role,
             environment={
                 "DB_SECRET_ARN": db_credentials.secret_arn,
@@ -247,24 +253,23 @@ class AuroraKnowledgeBaseStack(Stack):
             },
         )
 
-        # # Custom resource to run the setup Lambda
-        # setup_db_provider = cr.Provider(
-        #     self,
-        #     "SetupDatabaseProvider",
-        #     on_event_handler=setup_pgvector_lambda,
-        # )
+        # Custom resource to run the setup Lambda
+        setup_db_provider = cr.Provider(
+            self,
+            "SetupDatabaseProvider",
+            on_event_handler=setup_pgvector_lambda,
+        )
 
-        # setup_db = CustomResource(
-        #     self,
-        #     "SetupDatabase",
-        #     service_token=setup_db_provider.service_token,
-        #     properties={
-        #         "Timestamp": self.node.addr
-        #     },  # Ensure this runs on each deployment
-        # )
-        # setup_db.node.add_dependency(aurora_cluster)
+        setup_db = CustomResource(
+            self,
+            "SetupDatabase",
+            service_token=setup_db_provider.service_token,
+            properties={"Timestamp": self.node.addr},
+        )
+        setup_db.node.add_dependency(aurora_proxy)
+        setup_db.node.add_dependency(aurora_cluster)
 
-        amazon_bedrock_execution_role = iam.Role(
+        bedrock_role = iam.Role(
             self,
             "AmazonBedrockExecutionRoleForKnowledgeBase",
             assumed_by=iam.PrincipalWithConditions(
@@ -280,7 +285,7 @@ class AuroraKnowledgeBaseStack(Stack):
         )
 
         # Add S3 read permissions
-        amazon_bedrock_execution_role.add_to_policy(
+        bedrock_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["s3:GetObject", "s3:ListBucket", "s3:Describe*"],
@@ -291,27 +296,37 @@ class AuroraKnowledgeBaseStack(Stack):
             )
         )
 
+        # TODO
         # Add Aurora access permissions
-        amazon_bedrock_execution_role.add_to_policy(
+        # bedrock_role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=["rds-data:*"],
+        #         resources=[aurora_cluster.cluster_arn],
+        #     )
+        # )
+
+        # Add Aurora access permissions
+        bedrock_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
-                actions=["rds-data:*"],
-                resources=[aurora_cluster.cluster_arn],
+                actions=["rds-data:*", "rds:*"],
+                resources=["*"],
             )
         )
 
         # Grant access to the secret containing database credentials
-        db_credentials.grant_read(amazon_bedrock_execution_role)
+        db_credentials.grant_read(bedrock_role)
 
         # Add Bedrock model access
-        amazon_bedrock_execution_role.add_to_policy(
+        bedrock_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["bedrock:ListCustomModels"],
                 resources=["*"],
             )
         )
-        amazon_bedrock_execution_role.add_to_policy(
+        bedrock_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["bedrock:InvokeModel"],
@@ -330,13 +345,12 @@ class AuroraKnowledgeBaseStack(Stack):
         aurora_cluster_arn = aurora_cluster.cluster_arn
         aurora_secret_arn = db_credentials.secret_arn
 
-        bedrock_role_arn = amazon_bedrock_execution_role.role_arn
+        bedrock_role_arn = bedrock_role.role_arn
 
         #################################################################################
         # CDK For Bedrock Knowledge Base
         #################################################################################
 
-        knowledge_base_name = "rag-kb"
         knowledge_base_description = (
             "Answer based only on information contained in knowledge base."
         )
@@ -440,36 +454,36 @@ class AuroraKnowledgeBaseStack(Stack):
         )
 
         # Create Knowledge Base resource
-        knowledge_base = CfnResource(
+        knowledge_base = bedrock.CfnKnowledgeBase(
             self,
             "KnowledgeBaseWithAurora",
-            type="AWS::Bedrock::KnowledgeBase",
-            properties={
-                "Name": knowledge_base_name,
-                "Description": knowledge_base_description,
-                "RoleArn": bedrock_role_arn,
-                "KnowledgeBaseConfiguration": {
-                    "Type": "VECTOR",
-                    "VectorKnowledgeBaseConfiguration": {
-                        "EmbeddingModelArn": f"arn:{self.partition}:bedrock:{self.region}::foundation-model/{embeddings_model_id}"
-                    },
-                },
-                "StorageConfiguration": {
-                    "Type": "AURORA",
-                    "AuroraConfiguration": {
-                        "DatabaseName": database_name,
-                        "ClusterArn": aurora_cluster_arn,
-                        "Credentials": {"SecretArn": aurora_secret_arn},
-                        "TableName": "bedrock_integration.bedrock_kb",  # Table name where vectors are stored
-                        "VectorSchema": {
-                            "VectorField": "embedding",
-                            "TextField": "text",
-                            "MetadataField": "metadata",
-                        },
-                    },
-                },
-            },
+            name=knowledge_base_name,
+            description=knowledge_base_description,
+            role_arn=bedrock_role_arn,
+            knowledge_base_configuration=bedrock.CfnKnowledgeBase.KnowledgeBaseConfigurationProperty(
+                type="VECTOR",
+                vector_knowledge_base_configuration=bedrock.CfnKnowledgeBase.VectorKnowledgeBaseConfigurationProperty(
+                    embedding_model_arn=f"arn:{self.partition}:bedrock:{self.region}::foundation-model/{embeddings_model_id}"
+                ),
+            ),
+            storage_configuration=bedrock.CfnKnowledgeBase.StorageConfigurationProperty(
+                type="RDS",
+                rds_configuration=bedrock.CfnKnowledgeBase.RdsConfigurationProperty(
+                    database_name=database_name,
+                    resource_arn=aurora_cluster_arn,
+                    credentials_secret_arn=aurora_secret_arn,
+                    table_name="bedrock_integration.bedrock_kb",
+                    field_mapping=bedrock.CfnKnowledgeBase.RdsFieldMappingProperty(
+                        primary_key_field="id",
+                        vector_field="embedding",
+                        text_field="chunks",
+                        metadata_field="metadata",
+                    ),
+                ),
+            ),
         )
+
+        knowledge_base.node.add_dependency(setup_db)
 
         # Create the data source
         data_source = CfnResource(
@@ -540,10 +554,4 @@ class AuroraKnowledgeBaseStack(Stack):
         )
         lambda_trigger.node.add_dependency(lambda_permission)
 
-        # Export the Knowledge Base ID
-        CfnOutput(
-            self,
-            "KBID",
-            value=knowledge_base.ref,
-            export_name="KnowledgeBaseID",
-        )
+        self.knowledge_base_id = knowledge_base.ref
