@@ -46,6 +46,8 @@ class LexBotStack(Stack):
             ],
         )
 
+        lex_role.add_to_policy(bedrock_policy)
+
         qna_intent = lex.CfnBot.IntentProperty(
             name="QnAIntent",
             description="Intent for Q&A functionality",
