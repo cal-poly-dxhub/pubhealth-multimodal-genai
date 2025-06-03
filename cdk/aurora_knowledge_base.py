@@ -1,6 +1,7 @@
+from typing import Dict
+
 from aws_cdk import (
     BundlingOptions,
-    CfnResource,
     CustomResource,
     Duration,
     RemovalPolicy,
@@ -42,6 +43,8 @@ class AuroraKnowledgeBaseStack(Stack):
         database_name: str,
         knowledge_base_name: str,
         embeddings_model_id: str,
+        chunking_strategy: str,
+        chunking_config: Dict[str, int],
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -486,18 +489,46 @@ class AuroraKnowledgeBaseStack(Stack):
         knowledge_base.node.add_dependency(setup_db)
 
         # Create the data source
-        data_source = CfnResource(
+        data_source = bedrock.CfnDataSource(
             self,
-            "SampleDataSource",
-            type="AWS::Bedrock::DataSource",
-            properties={
-                "KnowledgeBaseId": knowledge_base.ref,
-                "Name": s3_bucket_name,
-                "DataSourceConfiguration": {
-                    "Type": "S3",
-                    "S3Configuration": {"BucketArn": s3_bucket_arn},
-                },
-            },
+            "KnowledgeBaseDataSource",
+            knowledge_base_id=knowledge_base.ref,
+            name=s3_bucket_name,
+            data_source_configuration=bedrock.CfnDataSource.DataSourceConfigurationProperty(
+                type="S3",
+                s3_configuration=bedrock.CfnDataSource.S3DataSourceConfigurationProperty(
+                    bucket_arn=s3_bucket_arn
+                ),
+            ),
+            vector_ingestion_configuration=bedrock.CfnDataSource.VectorIngestionConfigurationProperty(
+                chunking_configuration=bedrock.CfnDataSource.ChunkingConfigurationProperty(
+                    chunking_strategy=chunking_strategy,
+                    fixed_size_chunking_configuration=bedrock.CfnDataSource.FixedSizeChunkingConfigurationProperty(
+                        max_tokens=chunking_config["max_tokens"],
+                        overlap_percentage=chunking_config[
+                            "overlap_percentage"
+                        ],
+                    ),
+                    hierarchical_chunking_configuration=bedrock.CfnDataSource.HierarchicalChunkingConfigurationProperty(
+                        level_configurations=[
+                            bedrock.CfnDataSource.HierarchicalChunkingLevelConfigurationProperty(
+                                max_tokens=chunking_config["max_parent_tokens"],
+                            ),
+                            bedrock.CfnDataSource.HierarchicalChunkingLevelConfigurationProperty(
+                                max_tokens=chunking_config["max_child_tokens"]
+                            ),
+                        ],
+                        overlap_tokens=chunking_config["overlap_tokens"],
+                    ),
+                    semantic_chunking_configuration=bedrock.CfnDataSource.SemanticChunkingConfigurationProperty(
+                        breakpoint_percentile_threshold=chunking_config[
+                            "breakpoint_percentile_threshold"
+                        ],
+                        buffer_size=chunking_config["buffer_size"],
+                        max_tokens=chunking_config["max_tokens"],
+                    ),
+                ),
+            ),
         )
 
         # Add Bedrock permissions to KBSyncRole
