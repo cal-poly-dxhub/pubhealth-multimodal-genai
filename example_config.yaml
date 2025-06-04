@@ -1,7 +1,7 @@
 opensearch_endpoint: <your-opensearch-endpoint>
 region: <your-aws-region>
 
-iam_user_arn: <your-iam-user-arn> # ARN running this template
+iam_user_arn: <your-iam-user-arn> # ARN running this template (your user)
 database_name: ragvectordatabase
 knowledge_base_name: rag-kb
 
