@@ -149,3 +149,6 @@ class LexBotStack(Stack):
             bot_version=bot_version.attr_bot_version,  # Use the output attribute
             sentiment_analysis_settings={"DetectSentiment": False},
         )
+
+        self.lex_bot_id = bot.ref
+        self.lex_bot_alias_id = bot_alias.ref
