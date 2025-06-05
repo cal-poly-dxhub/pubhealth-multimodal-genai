@@ -1,58 +1,138 @@
+# RAG Serverless Chatbot Solution
 
-# Welcome to your CDK Python project!
 
-This is a blank project for CDK development with Python.
+## Table of Contents
+- [Collaboration](#collaboration)
+- [Disclaimers](#disclaimers)
+- [Overview](#chatbot-overview)
+- [Deployment Steps](#deployment-steps)
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
 
-To manually create a virtualenv on MacOS and Linux:
+# Collaboration
+Thanks for your interest in our solution.  Having specific examples of replication and cloning allows us to continue to grow and scale our work. If you clone or download this repository, kindly shoot us a quick email to let us know you are interested in this work!
 
+[wwps-cic@amazon.com]
+
+# Disclaimers
+
+**Customers are responsible for making their own independent assessment of the information in this document.**
+
+**This document:**
+
+(a) is for informational purposes only,
+
+(b) represents current AWS product offerings and practices, which are subject to change without notice, and
+
+(c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. The responsibilities and liabilities of AWS to its customers are controlled by AWS agreements, and this document is not part of, nor does it modify, any agreement between AWS and its customers.
+
+(d) is not to be considered a recommendation or viewpoint of AWS
+
+**Additionally, all prototype code and associated assets should be considered:**
+
+(a) as-is and without warranties
+
+(b) not suitable for production environments
+
+(d) to include shortcuts in order to support rapid prototyping such as, but not limitted to, relaxed authentication and authorization and a lack of strict adherence to security best practices
+
+**All work produced is open source. More information can be found in the GitHub repo.**
+
+## Authors
+- Venkata Kampana - kampanav@amazon.com
+- Nick Riley - njriley@calpoly.edu
+
+## Deployment Steps
+
+### Prerequisites
+- AWS CDK CLI
+- Docker
+- Python 3.x
+- AWS credentials
+- Bedrock model access
+- Git
+
+Configure AWS Credentials and Region with an Access key
+```bash
+aws configure
 ```
-$ python3 -m venv .venv
+
+Clone the repo:
+```bash
+git clone https://github.com/cal-poly-dxhub/rag-chatbot-serverless.git
 ```
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
-
+Rename example config file:
+```bash
+mv example_config.yaml config.yaml
 ```
-$ source .venv/bin/activate
-```
+Fill in config with your AWS values.
 
-If you are a Windows platform, you would activate the virtualenv like this:
-
-```
-% .venv\Scripts\activate.bat
-```
-
-Once the virtualenv is activated, you can install the required dependencies.
-
-```
-$ pip install -r requirements.txt
+Install `requirements.txt`:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install -r requirements.txt
 ```
 
-At this point you can now synthesize the CloudFormation template for this code.
+### 1. Infrastructure Deployment
+```bash
+cd cdk
 
+# Synthesize the CloudFormation template
+cdk synth --all
+
+# Deploy the stacks
+cdk deploy --all
 ```
-$ cdk synth
+
+### 2. File Upload to S3
+Upload local files to S3 bucket with the name:
+`<database_name>-<account_number>`
+
+### 3. Document Processing
+
+Go into the bedrock console and run sync on your knowledge base.
+
+### 4. Testing
+Once document ingestion is complete, you can test the system in Amazon Connect.
+
+
+## Troubleshooting
+- Ensure docker is running and you have access to it. To grant access run:
+```bash
+sudo usermod -aG docker $USER # Give docker access to current user
+newgrp docker # Refresh group
 ```
+- Verify AWS credentials are properly configured
+- Check S3 bucket permissions
+- Ensure all required dependencies are installed
+- Verify API endpoints are accessible via `chat_test.py`
+- If encountering throttling errors, try changing the chat model
 
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
+## Known Bugs/Concerns
+- Quick PoC with no intent verification or error checking
 
-## Useful commands
 
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
+## Cost
+| Component | 1K Messages | 10K Messages | 100K Messages |
+|-----------|------------|-------------|--------------|
+| Claude 3 Haiku | | | | |
+| Input tokens | $0.05 | $0.50 | $5.00 |
+| Output tokens | $0.13 | $1.25 | $12.50 |
+| Amazon Lex | | | | |
+| Text requests | $0.75 | $7.50 | $75.00 |
+| Amazon Connect | | | | |
+| Chat messages | $4.00 | $40.00 | $400.00 |
+| Aurora pgvector | | | | |
+| Compute (ACUs) | $43.80 | $87.60 | $175.20 |
+| Storage | $0.10 | $0.20 | $0.50 | $2.00 |
+| Total Monthly Cost | $48.83 | $137.05 | $668.20 |
 
-Enjoy!
+**Disclaimer:** This is only an estimate, pricing varies on user behaviour and traffic.
+
+
+## Support
+For any queries or issues, please contact:
+- Venkata Kampana, Sr Solutions Architect - kampanv@amazon.com
+- Nick Riley, Jr. SDE - njriley@amazon.com
