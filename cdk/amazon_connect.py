@@ -32,7 +32,7 @@ class ConnectStack(Stack):
         construct_id: str,
         environment: str,
         lex_bot_id: str,
-        lex_bot_alias_id: str,
+        chat_welcome_prompt: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -43,15 +43,14 @@ class ConnectStack(Stack):
             "ConnectInstance",
             attributes=connect.CfnInstance.AttributesProperty(
                 contactflow_logs=True,
-                inbound_calls=False,
-                outbound_calls=False,
+                inbound_calls=True,
+                outbound_calls=True,
             ),
             identity_management_type="CONNECT_MANAGED",
             instance_alias=f"demoinstance-{self.stack_name}-{environment}",
         )
 
-        # TODO Reimplement phone number
-        # Phone Number
+        # # Phone number
         # phone_number = connect.CfnPhoneNumber(
         #     self,
         #     "PhoneNumber",
@@ -251,7 +250,6 @@ class ConnectStack(Stack):
             ],
         )
 
-        # TODO
         get_contact_queue_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -261,23 +259,6 @@ class ConnectStack(Stack):
                 ],
             )
         )
-
-        # get_contact_queue_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=[
-        #             "connect:ListQueues",
-        #             "connect:GetPaginator",
-        #             "connect:DescribeQueue",
-        #             "connect:ListSecurityProfiles",
-        #         ],
-        #         resources=[
-        #             f"arn:{self.partition}:connect:{self.region}:{self.account}:instance/{connect_instance.ref}/queue/*",
-        #             f"arn:{self.partition}:connect:{self.region}:{self.account}:instance/{connect_instance.ref}/*",
-        #             f"arn:{self.partition}:connect:{self.region}:{self.account}:instance/{connect_instance.ref}",
-        #         ],
-        #     )
-        # )
 
         # Lambda Function for GetContactQueue
         get_contact_queue_lambda = lambda_.Function(
@@ -318,377 +299,144 @@ class ConnectStack(Stack):
         )
 
         contact_template = Template("""
-        {
-            "Version": "2019-10-30",
-            "StartAction": "d91372dd-38b1-4b07-b4a8-c1bbc39cb3db",
-            "Metadata": {
+            {
+              "Version": "2019-10-30",
+              "StartAction": "d91372dd-38b1-4b07-b4a8-c1bbc39cb3db",
+              "Metadata": {
                 "entryPointPosition": {
-                    "x": -175.2,
-                    "y": 40
+                  "x": -175.2,
+                  "y": 40
                 },
                 "ActionMetadata": {
-                    "0299712b-cfeb-40fe-9e65-9493bad9e323": {
+                  "5cf04938-31f2-49e3-a118-86f685a5d99f": {
                     "position": {
-                        "x": 1247.2,
-                        "y": 20
+                      "x": 1064,
+                      "y": 298.4
                     }
-                    },
-                    "43540b5a-4cf6-4a7e-a423-72805dec7454": {
+                  },
+                  "error-message": {
                     "position": {
-                        "x": 1009.6,
-                        "y": -72.8
+                      "x": 297.6,
+                      "y": 479.2
+                    }
+                  },
+                  "d91372dd-38b1-4b07-b4a8-c1bbc39cb3db": {
+                    "position": {
+                      "x": 8,
+                      "y": 21.6
+                    }
+                  },
+                  "70af26d9-bdf9-4c41-ab94-525e982559aa": {
+                    "position": {
+                      "x": 588.8,
+                      "y": -31.2
                     },
                     "parameters": {
-                        "QueueId": {
-                            "displayName": "BasicQueue"
+                      "Text": {
+                        "useDynamic": true
+                      },
+                      "LexV2Bot": {
+                        "AliasArn": {
+                          "useLexBotDropdown": false
                         }
+                      }
                     },
-                    "queue": {
-                        "text": "BasicQueue"
-                    }
-                    },
-                    "5eeadcb8-98a2-46bd-b34e-7157f0cdf1bd": {
-                    "position": {
-                        "x": 635.2,
-                        "y": 476.8
-                    }
-                    },
-                    "1e500556-e4c7-49e8-8559-82c241800624": {
-                    "position": {
-                        "x": 301.6,
-                        "y": 476
-                    }
-                    },
-                    "91105f3b-dd0b-4ecd-9450-4fe159c2bede": {
-                    "position": {
-                        "x": 902.4,
-                        "y": 459.2
-                    }
-                    },
-                    "2e6e4ab3-0d83-4cd0-82fa-ef05797278c6": {
-                    "position": {
-                        "x": 772,
-                        "y": 0.8
-                    }
-                    },
-                    "d91372dd-38b1-4b07-b4a8-c1bbc39cb3db": {
-                    "position": {
-                        "x": 8,
-                        "y": 21.6
-                    }
-                    },
-                    "0120f1fa-d67d-4b4a-8698-646f2e0b596d": {
-                    "position": {
-                        "x": 276.8,
-                        "y": 12.8
-                    },
-                    "dynamicParams": [
-
-                    ]
-                    },
-                    "5cf04938-31f2-49e3-a118-86f685a5d99f": {
-                    "position": {
-                        "x": 1064,
-                        "y": 298.4
-                    }
-                    },
-                    "70af26d9-bdf9-4c41-ab94-525e982559aa": {
-                    "position": {
-                        "x": 529.6,
-                        "y": -2.4
-                    },
-                    "parameters": {
-                        "Text": {
-                            "useDynamic": true
-                        },
-                        "LexV2Bot": {
-                            "AliasArn": {
-                                "displayName": "TestBotAlias",
-                                "useLexBotDropdown": true,
-                                "lexV2BotName": "medicaidchatbot"
-                            }
-                        }
-                    },
-                    "useLexBotDropdown": true,
-                    "lexV2BotName": "medicaidchatbot",
-                    "lexV2BotAliasName": "TestBotAlias",
+                    "lexV2BotName": "",
                     "useDynamic": true,
-                    "conditionMetadata": [
-                        {
-                            "id": "a93cefc4-795d-40d1-a13f-f4b3f8af722a",
-                            "operator": {
-                                "name": "Equals",
-                                "value": "Equals",
-                                "shortDisplay": "="
-                            },
-                            "value": "getAgent"
-                        },
-                        {
-                            "id": "334c27aa-1492-4d28-818e-7ec85250fe4f",
-                            "operator": {
-                                "name": "Equals",
-                                "value": "Equals",
-                                "shortDisplay": "="
-                            },
-                            "value": "FallbackIntent"
-                        },
-                        {
-                            "id": "296557d6-1ad8-4df9-9087-3c59d16832bf",
-                            "operator": {
-                                "name": "Equals",
-                                "value": "Equals",
-                                "shortDisplay": "="
-                            },
-                            "value": "no"
-                        },
-                        {
-                            "id": "48f02a88-53c0-43ca-b790-d8e8c58c6076",
-                            "operator": {
-                                "name": "Equals",
-                                "value": "Equals",
-                                "shortDisplay": "="
-                            },
-                            "value": "knowledgebase-Intent"
-                        }
-                    ]
-                    },
-                    "babab684-8ba6-4225-a0a1-8afc0a2fb310": {
+                    "conditionMetadata": []
+                  },
+                  "0120f1fa-d67d-4b4a-8698-646f2e0b596d": {
                     "position": {
-                        "x": 249.6,
-                        "y": 226.4
-                    }
-                    }
+                      "x": 272,
+                      "y": 8
+                    },
+                    "dynamicParams": []
+                  }
                 },
-                "Annotations": [
-
-                ],
-                "name": "medicaidchat- main",
-                "description": "",
+                "Annotations": [],
+                "name": "SimpleChatFlow",
+                "description": "Simple Q&A flow with Lex integration",
                 "type": "contactFlow",
-                "status": "PUBLISHED",
-                "hash": {
-
-                }
-            },
-            "Actions": [
+                "status": "published",
+                "hash": {}
+              },
+              "Actions": [
                 {
-                    "Parameters": {
-
-                    },
-                    "Identifier": "0299712b-cfeb-40fe-9e65-9493bad9e323",
-                    "Type": "TransferContactToQueue",
-                    "Transitions": {
-                    "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                    "Errors": [
-                        {
-                            "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                            "ErrorType": "QueueAtCapacity"
-                        },
-                        {
-                            "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
+                  "Parameters": {},
+                  "Identifier": "5cf04938-31f2-49e3-a118-86f685a5d99f",
+                  "Type": "DisconnectParticipant",
+                  "Transitions": {}
                 },
                 {
-                    "Parameters": {
-                    "QueueId": "$contact_queue_arn"
-                    },
-                    "Identifier": "43540b5a-4cf6-4a7e-a423-72805dec7454",
-                    "Type": "UpdateContactTargetQueue",
-                    "Transitions": {
-                    "NextAction": "0299712b-cfeb-40fe-9e65-9493bad9e323",
-                    "Errors": [
-                        {
-                            "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
-                },
-                {
-                    "Parameters": {
-                    "Text": "Anything else?"
-                    },
-                    "Identifier": "5eeadcb8-98a2-46bd-b34e-7157f0cdf1bd",
-                    "Type": "MessageParticipant",
-                    "Transitions": {
+                  "Parameters": {
+                    "Text": "I'm sorry, I'm unable to assist with that request."
+                  },
+                  "Identifier": "error-message",
+                  "Type": "MessageParticipant",
+                  "Transitions": {
                     "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
                     "Errors": [
-                        {
-                            "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
-                            "ErrorType": "NoMatchingError"
-                        }
+                      {
+                        "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
+                        "ErrorType": "NoMatchingError"
+                      }
                     ]
-                    }
+                  }
                 },
                 {
-                    "Parameters": {
-                    "Text": "sorry could not understand the question. I havent been trained on this question yet. Can I help you with something else?"
-                    },
-                    "Identifier": "1e500556-e4c7-49e8-8559-82c241800624",
-                    "Type": "MessageParticipant",
-                    "Transitions": {
-                    "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
-                    "Errors": [
-                        {
-                            "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
-                },
-                {
-                    "Parameters": {
-                    "Text": "sorry we are experiencing system problems. Please wait for the next available agent."
-                    },
-                    "Identifier": "91105f3b-dd0b-4ecd-9450-4fe159c2bede",
-                    "Type": "MessageParticipant",
-                    "Transitions": {
-                    "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                    "Errors": [
-                        {
-                            "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
-                },
-                {
-                    "Parameters": {
-                    "Text": "Please hold while I transfer you to an agent."
-                    },
-                    "Identifier": "2e6e4ab3-0d83-4cd0-82fa-ef05797278c6",
-                    "Type": "MessageParticipant",
-                    "Transitions": {
-                    "NextAction": "43540b5a-4cf6-4a7e-a423-72805dec7454",
-                    "Errors": [
-                        {
-                            "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
-                },
-                {
-                    "Parameters": {
+                  "Parameters": {
                     "FlowLoggingBehavior": "Enabled"
-                    },
-                    "Identifier": "d91372dd-38b1-4b07-b4a8-c1bbc39cb3db",
-                    "Type": "UpdateFlowLoggingBehavior",
-                    "Transitions": {
+                  },
+                  "Identifier": "d91372dd-38b1-4b07-b4a8-c1bbc39cb3db",
+                  "Type": "UpdateFlowLoggingBehavior",
+                  "Transitions": {
                     "NextAction": "0120f1fa-d67d-4b4a-8698-646f2e0b596d"
-                    }
+                  }
                 },
                 {
-                    "Parameters": {
+                  "Parameters": {
+                    "Text": "$.Attributes.prompt",
+                    "LexV2Bot": {
+                      "AliasArn": "arn:aws:lex:us-west-2:762233745628:bot-alias/3FG9TGNAS6/TSTALIASID"
+                    }
+                  },
+                  "Identifier": "70af26d9-bdf9-4c41-ab94-525e982559aa",
+                  "Type": "ConnectParticipantWithLexBot",
+                  "Transitions": {
+                    "NextAction": "error-message",
+                    "Errors": [
+                      {
+                        "NextAction": "0120f1fa-d67d-4b4a-8698-646f2e0b596d",
+                        "ErrorType": "NoMatchingCondition"
+                      },
+                      {
+                        "NextAction": "error-message",
+                        "ErrorType": "NoMatchingError"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "Parameters": {
                     "Attributes": {
-                        "prompt": "Welcome to the state medicaid agency website. How can we help you?"
+                      "prompt": ${chat_welcome_prompt}
                     },
                     "TargetContact": "Current"
-                    },
-                    "Identifier": "0120f1fa-d67d-4b4a-8698-646f2e0b596d",
-                    "Type": "UpdateContactAttributes",
-                    "Transitions": {
+                  },
+                  "Identifier": "0120f1fa-d67d-4b4a-8698-646f2e0b596d",
+                  "Type": "UpdateContactAttributes",
+                  "Transitions": {
                     "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
                     "Errors": [
-                        {
-                            "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
-                            "ErrorType": "NoMatchingError"
-                        }
+                      {
+                        "NextAction": "70af26d9-bdf9-4c41-ab94-525e982559aa",
+                        "ErrorType": "NoMatchingError"
+                      }
                     ]
-                    }
-                },
-                {
-                    "Parameters": {
-
-                    },
-                    "Identifier": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                    "Type": "DisconnectParticipant",
-                    "Transitions": {
-
-                    }
-                },
-                {
-                    "Parameters": {
-                    "Text": "$$.Attributes.prompt",
-                    "LexV2Bot": {
-                        "AliasArn": "arn:aws:connect:${aws_region}:${aws_account_id}:bot-alias/${lex_bot_id}/${lex_bot_alias_id}"
-                    }
-                    },
-                    "Identifier": "70af26d9-bdf9-4c41-ab94-525e982559aa",
-                    "Type": "ConnectParticipantWithLexBot",
-                    "Transitions": {
-                    "NextAction": "91105f3b-dd0b-4ecd-9450-4fe159c2bede",
-                    "Conditions": [
-                        {
-                            "NextAction": "2e6e4ab3-0d83-4cd0-82fa-ef05797278c6",
-                            "Condition": {
-                                "Operator": "Equals",
-                                "Operands": [
-                                "getAgent"
-                                ]
-                            }
-                        },
-                        {
-                            "NextAction": "1e500556-e4c7-49e8-8559-82c241800624",
-                            "Condition": {
-                                "Operator": "Equals",
-                                "Operands": [
-                                "FallbackIntent"
-                                ]
-                            }
-                        },
-                        {
-                            "NextAction": "babab684-8ba6-4225-a0a1-8afc0a2fb310",
-                            "Condition": {
-                                "Operator": "Equals",
-                                "Operands": [
-                                "no"
-                                ]
-                            }
-                        },
-                        {
-                            "NextAction": "5eeadcb8-98a2-46bd-b34e-7157f0cdf1bd",
-                            "Condition": {
-                                "Operator": "Equals",
-                                "Operands": [
-                                "knowledgebase-Intent"
-                                ]
-                            }
-                        }
-                    ],
-                    "Errors": [
-                        {
-                            "NextAction": "5eeadcb8-98a2-46bd-b34e-7157f0cdf1bd",
-                            "ErrorType": "NoMatchingCondition"
-                        },
-                        {
-                            "NextAction": "91105f3b-dd0b-4ecd-9450-4fe159c2bede",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
-                },
-                {
-                    "Parameters": {
-                    "Text": "Thanks for reaching out today. Have a nice day."
-                    },
-                    "Identifier": "babab684-8ba6-4225-a0a1-8afc0a2fb310",
-                    "Type": "MessageParticipant",
-                    "Transitions": {
-                    "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                    "Errors": [
-                        {
-                            "NextAction": "5cf04938-31f2-49e3-a118-86f685a5d99f",
-                            "ErrorType": "NoMatchingError"
-                        }
-                    ]
-                    }
+                  }
                 }
-            ]
-        }""")
+              ]
+            }""")
 
         contact_flow_data = {
             "contact_queue_arn": customer_queue.get_att_string(
@@ -697,7 +445,7 @@ class ConnectStack(Stack):
             "aws_region": self.region,
             "aws_account_id": self.account,
             "lex_bot_id": lex_bot_id,
-            "lex_bot_alias_id": lex_bot_alias_id,
+            "chat_welcome_prompt": chat_welcome_prompt,
         }
 
         contact_content = contact_template.substitute(contact_flow_data)
@@ -769,7 +517,7 @@ class ConnectStack(Stack):
             "S3BucketForAccessLogging",
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=RemovalPolicy.DESTROY,  # TODO Change to retain
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Add bucket policy for access logging bucket
@@ -794,7 +542,7 @@ class ConnectStack(Stack):
             encryption=s3.BucketEncryption.KMS,
             encryption_key=kms_key,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=RemovalPolicy.DESTROY,  # TODO Change to retain
+            removal_policy=RemovalPolicy.DESTROY,
             server_access_logs_bucket=access_logging_bucket,
             server_access_logs_prefix="access-logs",
         )
