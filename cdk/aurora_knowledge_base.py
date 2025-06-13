@@ -299,16 +299,6 @@ class AuroraKnowledgeBaseStack(Stack):
             )
         )
 
-        # TODO
-        # Add Aurora access permissions
-        # bedrock_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=["rds-data:*"],
-        #         resources=[aurora_cluster.cluster_arn],
-        #     )
-        # )
-
         # Add Aurora access permissions
         bedrock_role.add_to_policy(
             iam.PolicyStatement(
