@@ -395,9 +395,9 @@ class ConnectStack(Stack):
                 },
                 {
                   "Parameters": {
-                    "Text": "$.Attributes.prompt",
+                    "Text": "$$.Attributes.prompt",
                     "LexV2Bot": {
-                      "AliasArn": "arn:aws:lex:us-west-2:762233745628:bot-alias/3FG9TGNAS6/TSTALIASID"
+                      "AliasArn": "arn:aws:lex:${aws_region}:${aws_account_id}:bot-alias/${lex_bot_id}/TSTALIASID"
                     }
                   },
                   "Identifier": "70af26d9-bdf9-4c41-ab94-525e982559aa",
@@ -419,7 +419,7 @@ class ConnectStack(Stack):
                 {
                   "Parameters": {
                     "Attributes": {
-                      "prompt": ${chat_welcome_prompt}
+                      "prompt": "${chat_welcome_prompt}"
                     },
                     "TargetContact": "Current"
                   },
@@ -454,8 +454,8 @@ class ConnectStack(Stack):
         contact_flow = connect.CfnContactFlow(
             self,
             "Flow",
-            name="DemochatFlow",
-            description="Demo flow with integration to Lex and Bedrock Knowledgebase",
+            name="BasicChatFlow",
+            description="Basic flow with integration to Lex and Bedrock Knowledgebase",
             instance_arn=connect_instance.attr_arn,
             type="CONTACT_FLOW",
             content=contact_content,
