@@ -1,7 +1,7 @@
-##This CloudFormation template deploys sample RAG architecture with Amazon OpenSearch + Bedrock + Lex
+## This CDK deploys sample RAG architecture with Lex
 ## 1.Creates Amazon lex bot with 2 intents .Fallback intent is set to trigger Lambda(Orchestrator)
-## 2.Creates Lambda(Orchestrator) which integrates Amazon Bedrock,Amazon Lex
-##The output of the CloudFormation template shows the Lambda Function and DynomoDB table .
+## 2.Creates Lambda(Orchestrator) which integrates Amazon Bedrock, Amazon Lex
+## The output of the CloudFormation template shows the Lambda Function and DynomoDB table.
 
 
 from aws_cdk import CfnOutput, CfnResource, Duration, RemovalPolicy, Stack
