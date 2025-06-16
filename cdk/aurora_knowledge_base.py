@@ -65,8 +65,7 @@ class AuroraKnowledgeBaseStack(Stack):
         # Main S3 Bucket
         s3_bucket = s3.Bucket(
             self,
-            "S3Bucket",
-            bucket_name=f"{database_name}-{self.account}",
+            "RAGDataBucket",
             encryption=s3.BucketEncryption.S3_MANAGED,
             server_access_logs_bucket=s3_bucket_for_logging,
             server_access_logs_prefix="access-logs",
@@ -183,7 +182,7 @@ class AuroraKnowledgeBaseStack(Stack):
         # Create Aurora Serverless v2 Cluster
         aurora_cluster = rds.DatabaseCluster(
             self,
-            "AuroraServerlessCluster",
+            "RagVectorDB",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
                 version=rds.AuroraPostgresEngineVersion.VER_15_4
             ),
@@ -192,11 +191,10 @@ class AuroraKnowledgeBaseStack(Stack):
                 subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
             ),
             writer=rds.ClusterInstance.serverless_v2("Writer"),
-            default_database_name=database_name,
             credentials=rds.Credentials.from_secret(db_credentials),
             removal_policy=RemovalPolicy.DESTROY,
             serverless_v2_min_capacity=0.5,  # Minimum ACU
-            serverless_v2_max_capacity=1.0,  # Maximum ACU
+            serverless_v2_max_capacity=1.0,  # Maximum ACU #TODO make configurable
             enable_data_api=True,
         )
 
@@ -252,7 +250,7 @@ class AuroraKnowledgeBaseStack(Stack):
             environment={
                 "DB_SECRET_ARN": db_credentials.secret_arn,
                 "DB_HOST": aurora_proxy.endpoint,
-                "DB_NAME": database_name,
+                "DB_NAME": aurora_cluster.cluster_identifier,
             },
         )
 
@@ -462,7 +460,7 @@ class AuroraKnowledgeBaseStack(Stack):
             storage_configuration=bedrock.CfnKnowledgeBase.StorageConfigurationProperty(
                 type="RDS",
                 rds_configuration=bedrock.CfnKnowledgeBase.RdsConfigurationProperty(
-                    database_name=database_name,
+                    database_name=aurora_cluster.cluster_identifier,
                     resource_arn=aurora_cluster_arn,
                     credentials_secret_arn=aurora_secret_arn,
                     table_name="bedrock_integration.bedrock_kb",
