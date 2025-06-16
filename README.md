@@ -81,7 +81,7 @@ pip3 install -r requirements.txt
 # Synthesize the template
 cdk synth
 
-# Deploy the stacks
+# Deploy the stack
 cdk deploy
 ```
 
