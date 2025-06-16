@@ -7,7 +7,7 @@ import yaml
 
 from cdk.amazon_connect import ConnectStack
 from cdk.aurora_knowledge_base import AuroraKnowledgeBaseStack
-from cdk.lex_bot import LexBotStack
+from cdk.lambda_lex_bot import LambdaLexStack
 
 
 class CommunicationChannels(Enum):
@@ -20,8 +20,6 @@ class CommunicationChannels(Enum):
 CONFIG_PATH = "./config.yaml"
 config = yaml.safe_load(open(CONFIG_PATH))
 
-iam_user_arn = config["iam_user_arn"]
-database_name = config["database_name"]
 knowledge_base_name = config["knowledge_base_name"]
 embeddings_model_id = config["embeddings_model_id"]
 chat_model_id = config["chat_model_id"]
@@ -69,27 +67,24 @@ app = cdk.App()
 knowledge_base_stack = AuroraKnowledgeBaseStack(
     app,
     "AuroraKnowledgeBaseStack",
-    iam_user_arn=iam_user_arn,
-    database_name=database_name,
     knowledge_base_name=knowledge_base_name,
     embeddings_model_id=embeddings_model_id,
     chunking_strategy=chunking_strategy,
     chunking_config=chunking_config,
 )
 
-lex_stack = LexBotStack(
+bot_stack = LambdaLexStack(
     app,
-    "LexBotStack",
-    name="medicaidbot",
+    "LambdaLexStack",
     knowledge_base_id=knowledge_base_stack.knowledge_base_id,
-    chat_model_id=chat_model_id,
+    bedrock_model_id=chat_model_id,
 )
 
 ConnectStack(
     app,
     "ConnectStack",
-    environment="dev",
-    lex_bot_id=lex_stack.lex_bot_alias_id,
-    lex_bot_alias_id=lex_stack.lex_bot_alias_id,
+    environment=config["environment"],
+    lex_bot_id=bot_stack.lex_bot_id,
+    chat_welcome_prompt=config["chat_welcome_prompt"],
 )
 app.synth()
