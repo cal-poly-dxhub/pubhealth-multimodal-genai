@@ -77,18 +77,17 @@ pip3 install -r requirements.txt
 
 ### 1. Infrastructure Deployment
 ```bash
-cd cdk
 
-# Synthesize the CloudFormation templates
-cdk synth --all
+# Synthesize the template
+cdk synth
 
 # Deploy the stacks
-cdk deploy --all
+cdk deploy
 ```
 
 ### 2. File Upload to S3
 Upload local files to S3 bucket with the name:
-`auroraknowledgebasestack-ragdatabucket-<uuid>`
+`<stack_name>-ragdatabucket-<uuid>`
 
 ### 3. Create Amazon Connect Widget
 You can find the [instructions to configure the widget here](https://docs.aws.amazon.com/connect/latest/adminguide/config-com-widget1.html).
