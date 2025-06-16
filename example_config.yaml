@@ -1,14 +1,12 @@
 region: <your-aws-region>
 
-iam_user_arn: <your-iam-user-arn> # ARN running this template (your user)
-database_name: ragvectordatabase
 knowledge_base_name: rag-kb
 
 embeddings_model_id: amazon.titan-embed-text-v1
 chat_model_id: anthropic.claude-3-haiku-20240307-v1:0
 #chat_model_id: anthropic.claude-3-sonnet-20240229-v1:0
 
-chunking_strategy: HIERARCHICAL
+chunking_strategy: HIERARCHICAL # HIERARCHICAL or FIXED_SIZE or SEMANTIC
 # Hierarchical configuration
 hierarchical:
   overlap_tokens: 20

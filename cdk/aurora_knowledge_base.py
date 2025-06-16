@@ -39,8 +39,6 @@ class AuroraKnowledgeBaseStack(Stack):
         self,
         scope: Construct,
         id: str,
-        iam_user_arn: str,
-        database_name: str,
         knowledge_base_name: str,
         embeddings_model_id: str,
         chunking_strategy: str,
@@ -65,7 +63,7 @@ class AuroraKnowledgeBaseStack(Stack):
         # Main S3 Bucket
         s3_bucket = s3.Bucket(
             self,
-            "RAGDataBucket",
+            "RagDataBucket",
             encryption=s3.BucketEncryption.S3_MANAGED,
             server_access_logs_bucket=s3_bucket_for_logging,
             server_access_logs_prefix="access-logs",
@@ -331,8 +329,6 @@ class AuroraKnowledgeBaseStack(Stack):
         s3_bucket_arn = s3_bucket.bucket_arn
         s3_bucket_name = s3_bucket.bucket_name
 
-        iam_user_arn = iam_user_arn
-
         aurora_cluster_arn = aurora_cluster.cluster_arn
         aurora_secret_arn = db_credentials.secret_arn
 
@@ -447,7 +443,7 @@ class AuroraKnowledgeBaseStack(Stack):
         # Create Knowledge Base resource
         knowledge_base = bedrock.CfnKnowledgeBase(
             self,
-            "KnowledgeBaseWithAurora",
+            "RagKnowledgeBase",
             name=knowledge_base_name,
             description=knowledge_base_description,
             role_arn=bedrock_role_arn,
