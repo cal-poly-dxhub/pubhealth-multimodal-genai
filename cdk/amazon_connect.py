@@ -5,7 +5,6 @@ from aws_cdk import (
     CustomResource,
     Duration,
     RemovalPolicy,
-    Stack,
 )
 from aws_cdk import (
     aws_connect as connect,
@@ -25,7 +24,7 @@ from aws_cdk import (
 from constructs import Construct
 
 
-class ConnectStack(Stack):
+class Connect(Construct):
     def __init__(
         self,
         scope: Construct,
@@ -33,9 +32,16 @@ class ConnectStack(Stack):
         environment: str,
         lex_bot_id: str,
         chat_welcome_prompt: str,
+        account_id: str,
+        region: str,
+        stack_name: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        #################################################################################
+        # CDK For Amazon Connect Resources
+        #################################################################################
 
         # Amazon Connect Instance
         connect_instance = connect.CfnInstance(
@@ -47,7 +53,7 @@ class ConnectStack(Stack):
                 outbound_calls=True,
             ),
             identity_management_type="CONNECT_MANAGED",
-            instance_alias=f"demoinstance-{self.stack_name}-{environment}",
+            instance_alias=f"demoinstance-{stack_name}-{environment}",
         )
 
         # # Phone number
@@ -76,7 +82,7 @@ class ConnectStack(Stack):
             iam.PolicyStatement(
                 actions=["connect:ListSecurityProfiles"],
                 resources=[
-                    f"arn:{self.partition}:connect:{self.region}:{self.account}:instance*",
+                    f"arn:aws:connect:{region}:{account_id}:instance*",
                 ],
             )
         )
@@ -138,9 +144,7 @@ class ConnectStack(Stack):
         get_routing_profile_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["connect:ListRoutingProfiles"],
-                resources=[
-                    f"arn:{self.partition}:connect:{self.region}:{self.account}:instance*"
-                ],
+                resources=[f"arn:aws:connect:{region}:{account_id}:instance*"],
             )
         )
 
@@ -193,9 +197,7 @@ class ConnectStack(Stack):
         generate_random_string_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["ssm:DeleteParameter", "ssm:PutParameter"],
-                resources=[
-                    f"arn:{self.partition}:ssm:{self.region}:{self.account}:parameter*"
-                ],
+                resources=[f"arn:aws:ssm:{region}:{account_id}:parameter*"],
             )
         )
 
@@ -254,9 +256,7 @@ class ConnectStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["connect:*"],
-                resources=[
-                    f"arn:{self.partition}:connect:{self.region}:{self.account}:*"
-                ],
+                resources=[f"arn:aws:connect:{region}:{account_id}:*"],
             )
         )
 
@@ -442,8 +442,8 @@ class ConnectStack(Stack):
             "contact_queue_arn": customer_queue.get_att_string(
                 "ContactQueueArn"
             ),
-            "aws_region": self.region,
-            "aws_account_id": self.account,
+            "aws_region": region,
+            "aws_account_id": account_id,
             "lex_bot_id": lex_bot_id,
             "chat_welcome_prompt": chat_welcome_prompt,
         }

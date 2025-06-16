@@ -1,10 +1,11 @@
 region: <your-aws-region>
 
 knowledge_base_name: rag-kb
+database_name: rag-db-vs
 
 embeddings_model_id: amazon.titan-embed-text-v1
-chat_model_id: anthropic.claude-3-haiku-20240307-v1:0
-#chat_model_id: anthropic.claude-3-sonnet-20240229-v1:0
+bedrock_model_id: anthropic.claude-3-haiku-20240307-v1:0
+#bedrock_model_id: anthropic.claude-3-sonnet-20240229-v1:0
 
 chunking_strategy: HIERARCHICAL # HIERARCHICAL or FIXED_SIZE or SEMANTIC
 # Hierarchical configuration

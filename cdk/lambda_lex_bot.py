@@ -4,7 +4,7 @@
 ## The output of the CloudFormation template shows the Lambda Function and DynomoDB table.
 
 
-from aws_cdk import CfnOutput, CfnResource, Duration, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, CfnResource, Duration, RemovalPolicy
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as _lambda
@@ -12,16 +12,22 @@ from aws_cdk import aws_lex as lex
 from constructs import Construct
 
 
-class LambdaLexStack(Stack):
+class LambdaAndLexBot(Construct):
     def __init__(
         self,
         scope: Construct,
         construct_id: str,
         knowledge_base_id: str,
         bedrock_model_id: str,
+        account_id: str,
+        region: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        #################################################################################
+        # CDK For DynamoDB and Lambda
+        #################################################################################
 
         # IAM role for Lambda Orchestrator
         lambda_role = iam.Role(
@@ -51,7 +57,7 @@ class LambdaLexStack(Stack):
             iam.PolicyStatement(
                 actions=["bedrock:RetrieveAndGenerate", "bedrock:Retrieve"],
                 resources=[
-                    f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/{knowledge_base_id}"
+                    f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{knowledge_base_id}"
                 ],
             )
         )
@@ -60,7 +66,7 @@ class LambdaLexStack(Stack):
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel"],
                 resources=[
-                    f"arn:aws:bedrock:{self.region}::foundation-model/{bedrock_model_id}"
+                    f"arn:aws:bedrock:{region}::foundation-model/{bedrock_model_id}"
                 ],
             )
         )
@@ -86,10 +92,14 @@ class LambdaLexStack(Stack):
             code=_lambda.Code.from_asset("src/lambda_orchestrator"),
             environment={
                 "KBID": knowledge_base_id,
-                "MODEL_ARN": f"arn:aws:bedrock:{self.region}::foundation-model/{bedrock_model_id}",
+                "MODEL_ARN": f"arn:aws:bedrock:{region}::foundation-model/{bedrock_model_id}",
                 "DDB_Name": conversation_table.table_name,
             },
         )
+
+        #################################################################################
+        # CDK For Lex Bot
+        #################################################################################
 
         # Bot Runtime Role
         bot_runtime_role = iam.Role(
@@ -113,8 +123,8 @@ class LambdaLexStack(Stack):
                     "bedrock:InvokeModel",
                 ],
                 resources=[
-                    f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/{knowledge_base_id}",
-                    f"arn:aws:bedrock:{self.region}::foundation-model/{bedrock_model_id}",
+                    f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{knowledge_base_id}",
+                    f"arn:aws:bedrock:{region}::foundation-model/{bedrock_model_id}",
                 ],
             )
         )
@@ -189,8 +199,8 @@ class LambdaLexStack(Stack):
             action="lambda:invokeFunction",
             function_name=lambda_function.function_name,
             principal="lex.amazonaws.com",
-            source_account=self.account,
-            source_arn=f"arn:aws:lex:{self.region}:{self.account}:bot-alias/{lex_bot.ref}/*",
+            source_account=account_id,
+            source_arn=f"arn:aws:lex:{region}:{account_id}:bot-alias/{lex_bot.ref}/*",
         )
 
         lambda_permission.node.add_dependency(lex_bot)
@@ -203,13 +213,11 @@ class LambdaLexStack(Stack):
                     "Effect": "Allow",
                     "Principal": {"Service": "connect.amazonaws.com"},
                     "Action": "lex:*",
-                    "Resource": f"arn:aws:lex:{self.region}:762233745628:bot-alias/{lex_bot.ref}/TSTALIASID",
+                    "Resource": f\"arn:aws:lex:{region}:[AWS_ACCOUNT_ID]:bot-alias/{lex_bot.ref}/TSTALIASID",
                     "Condition": {
-                        "StringEquals": {
-                            "aws:SourceAccount": f"{self.account}"
-                        },
+                        "StringEquals": {"aws:SourceAccount": f"{account_id}"},
                         "ArnLike": {
-                            "aws:SourceArn": f"arn:aws:connect:{self.region}:{self.account}:instance/*"
+                            "aws:SourceArn": f"arn:aws:connect:{region}:{account_id}:instance/*"
                         },
                     },
                 }
@@ -221,7 +229,7 @@ class LambdaLexStack(Stack):
             self,
             "LexResourcePolicy",
             policy=lex_policy,
-            resource_arn=f"arn:aws:lex:{self.region}:{self.account}:bot-alias/{lex_bot.ref}/TSTALIASID",
+            resource_arn=f"arn:aws:lex:{region}:{account_id}:bot-alias/{lex_bot.ref}/TSTALIASID",
         )
 
         # Outputs

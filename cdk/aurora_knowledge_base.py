@@ -5,7 +5,6 @@ from aws_cdk import (
     CustomResource,
     Duration,
     RemovalPolicy,
-    Stack,
 )
 from aws_cdk import (
     aws_bedrock as bedrock,
@@ -34,15 +33,18 @@ from aws_cdk import (
 from constructs import Construct
 
 
-class AuroraKnowledgeBaseStack(Stack):
+class AuroraKnowledgeBase(Construct):
     def __init__(
         self,
         scope: Construct,
         id: str,
+        database_name: str,
         knowledge_base_name: str,
         embeddings_model_id: str,
         chunking_strategy: str,
         chunking_config: Dict[str, int],
+        account_id: str,
+        region: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -105,7 +107,7 @@ class AuroraKnowledgeBaseStack(Stack):
                 resources=[f"{s3_bucket_for_logging.bucket_arn}/*"],
                 conditions={
                     "ArnLike": {"aws:SourceArn": s3_bucket.bucket_arn},
-                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "StringEquals": {"aws:SourceAccount": account_id},
                 },
             )
         )
@@ -181,6 +183,7 @@ class AuroraKnowledgeBaseStack(Stack):
         aurora_cluster = rds.DatabaseCluster(
             self,
             "RagVectorDB",
+            default_database_name=database_name,
             engine=rds.DatabaseClusterEngine.aurora_postgres(
                 version=rds.AuroraPostgresEngineVersion.VER_15_4
             ),
@@ -248,7 +251,7 @@ class AuroraKnowledgeBaseStack(Stack):
             environment={
                 "DB_SECRET_ARN": db_credentials.secret_arn,
                 "DB_HOST": aurora_proxy.endpoint,
-                "DB_NAME": aurora_cluster.cluster_identifier,
+                "DB_NAME": database_name,
             },
         )
 
@@ -274,9 +277,9 @@ class AuroraKnowledgeBaseStack(Stack):
             assumed_by=iam.PrincipalWithConditions(
                 iam.ServicePrincipal("bedrock.amazonaws.com"),
                 conditions={
-                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "StringEquals": {"aws:SourceAccount": account_id},
                     "ArnLike": {
-                        "AWS:SourceArn": f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/*"
+                        "AWS:SourceArn": f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/*"
                     },
                 },
             ),
@@ -319,9 +322,7 @@ class AuroraKnowledgeBaseStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["bedrock:InvokeModel"],
-                resources=[
-                    f"arn:aws:bedrock:{self.region}::foundation-model/*"
-                ],
+                resources=[f"arn:aws:bedrock:{region}::foundation-model/*"],
             )
         )
 
@@ -364,7 +365,7 @@ class AuroraKnowledgeBaseStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["logs:CreateLogGroup"],
-                resources=[f"arn:aws:logs:{self.region}:{self.account}:*"],
+                resources=[f"arn:aws:logs:{region}:{account_id}:*"],
             )
         )
 
@@ -373,7 +374,7 @@ class AuroraKnowledgeBaseStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["logs:CreateLogStream", "logs:PutLogEvents"],
                 resources=[
-                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/customresource-lambda-functions:*"
+                    f"arn:aws:logs:{region}:{account_id}:log-group:/aws/lambda/customresource-lambda-functions:*"
                 ],
             )
         )
@@ -416,8 +417,8 @@ class AuroraKnowledgeBaseStack(Stack):
                     "s3:PutObject",
                 ],
                 resources=[
-                    f"arn:aws:s3:::rag-kb-{self.account}",
-                    f"arn:aws:s3:::rag-kb-{self.account}/*",
+                    f"arn:aws:s3:::rag-kb-{account_id}",
+                    f"arn:aws:s3:::rag-kb-{account_id}/*",
                 ],
             )
         )
@@ -426,7 +427,7 @@ class AuroraKnowledgeBaseStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["logs:CreateLogGroup"],
-                resources=[f"arn:aws:logs:{self.region}:{self.account}:*"],
+                resources=[f"arn:aws:logs:{region}:{account_id}:*"],
             )
         )
 
@@ -435,7 +436,7 @@ class AuroraKnowledgeBaseStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["logs:CreateLogStream", "logs:PutLogEvents"],
                 resources=[
-                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/kbsync-demo-functions:*"
+                    f"arn:aws:logs:{region}:{account_id}:log-group:/aws/lambda/kbsync-demo-functions:*"
                 ],
             )
         )
@@ -450,13 +451,13 @@ class AuroraKnowledgeBaseStack(Stack):
             knowledge_base_configuration=bedrock.CfnKnowledgeBase.KnowledgeBaseConfigurationProperty(
                 type="VECTOR",
                 vector_knowledge_base_configuration=bedrock.CfnKnowledgeBase.VectorKnowledgeBaseConfigurationProperty(
-                    embedding_model_arn=f"arn:{self.partition}:bedrock:{self.region}::foundation-model/{embeddings_model_id}"
+                    embedding_model_arn=f"arn:aws:bedrock:{region}::foundation-model/{embeddings_model_id}"
                 ),
             ),
             storage_configuration=bedrock.CfnKnowledgeBase.StorageConfigurationProperty(
                 type="RDS",
                 rds_configuration=bedrock.CfnKnowledgeBase.RdsConfigurationProperty(
-                    database_name=aurora_cluster.cluster_identifier,
+                    database_name=database_name,
                     resource_arn=aurora_cluster_arn,
                     credentials_secret_arn=aurora_secret_arn,
                     table_name="bedrock_integration.bedrock_kb",
@@ -470,6 +471,7 @@ class AuroraKnowledgeBaseStack(Stack):
             ),
         )
 
+        knowledge_base.node.add_dependency(aurora_cluster)
         knowledge_base.node.add_dependency(setup_db)
 
         # Create the data source
@@ -524,7 +526,7 @@ class AuroraKnowledgeBaseStack(Stack):
                     "bedrock:ListIngestionJobs",
                 ],
                 resources=[
-                    f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/{knowledge_base.ref}"
+                    f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{knowledge_base.ref}"
                 ],
             )
         )
@@ -553,7 +555,7 @@ class AuroraKnowledgeBaseStack(Stack):
             function_name=kb_sync.function_name,
             action="lambda:InvokeFunction",
             principal="s3.amazonaws.com",
-            source_account=self.account,
+            source_account=account_id,
             source_arn=s3_bucket_arn,
         )
 
