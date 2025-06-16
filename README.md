@@ -59,7 +59,7 @@ aws configure
 
 Clone the repo:
 ```bash
-git clone https://github.com/cal-poly-dxhub/rag-chatbot-serverless.git
+git clone https://github.com/cal-poly-dxhub/pubhealth-multimodal-genai.git
 ```
 
 Rename example config file:
@@ -79,7 +79,7 @@ pip3 install -r requirements.txt
 ```bash
 cd cdk
 
-# Synthesize the CloudFormation template
+# Synthesize the CloudFormation templates
 cdk synth --all
 
 # Deploy the stacks
@@ -88,31 +88,21 @@ cdk deploy --all
 
 ### 2. File Upload to S3
 Upload local files to S3 bucket with the name:
-`<database_name>-<account_number>`
+`auroraknowledgebasestack-ragdatabucket-<uuid>`
 
-### 3. Document Processing
-
-Go into the bedrock console and run sync on your knowledge base.
+### 3. Create Amazon Connect Widget
+You can find the [instructions to configure the widget here](https://docs.aws.amazon.com/connect/latest/adminguide/config-com-widget1.html).
+For a chatbot only experience: Enable text only.
 
 ### 4. Testing
 Once document ingestion is complete, you can test the system in Amazon Connect.
 
-
 ## Troubleshooting
-- Ensure docker is running and you have access to it. To grant access run:
-```bash
-sudo usermod -aG docker $USER # Give docker access to current user
-newgrp docker # Refresh group
-```
+- Ensure docker is running and you have access to it
 - Verify AWS credentials are properly configured
-- Check S3 bucket permissions
 - Ensure all required dependencies are installed
-- Verify API endpoints are accessible via `chat_test.py`
 - If encountering throttling errors, try changing the chat model
-
-## Known Bugs/Concerns
-- Quick PoC with no intent verification or error checking
-
+- Please reach out to the authors for further questions
 
 ## Cost
 | Component | 1K Messages | 10K Messages | 100K Messages |
