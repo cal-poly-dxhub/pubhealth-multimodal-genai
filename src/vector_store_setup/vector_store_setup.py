@@ -68,7 +68,7 @@ def handler(event, context):
                 cur.execute("""
                 CREATE TABLE IF NOT EXISTS bedrock_integration.bedrock_kb (
                     id uuid PRIMARY KEY,
-                    embedding vector(1536),
+                    embedding vector(1024),
                     chunks text,
                     metadata json,
                     custom_metadata jsonb
