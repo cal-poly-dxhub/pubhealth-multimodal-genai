@@ -89,6 +89,10 @@ cdk deploy
 Upload local files to S3 bucket with the name:
 `<stack_name>-ragdatabucket-<uuid>`
 
+This will trigger the knowledge base to sync and ingest the new documents.
+Syncing may take a few minutes to an hour depending on data size.
+To view this progress go to the bedrock knowledge base console.
+
 ### 3. Create Amazon Connect Widget
 You can find the [instructions to configure the widget here](https://docs.aws.amazon.com/connect/latest/adminguide/config-com-widget1.html).
 For a chatbot only experience: Enable text only.
