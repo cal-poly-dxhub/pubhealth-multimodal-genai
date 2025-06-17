@@ -95,7 +95,7 @@ To view this progress go to the bedrock knowledge base console.
 
 ### 3. Create Amazon Connect Widget
 You can find the [instructions to configure the widget here](https://docs.aws.amazon.com/connect/latest/adminguide/config-com-widget1.html).
-For a chatbot only experience: Enable text only.
+For a chatbot only experience: Use the provided BasicChatFlow and Enable text only.
 
 ### 4. Testing
 Once document ingestion is complete, you can test the system in Amazon Connect.
