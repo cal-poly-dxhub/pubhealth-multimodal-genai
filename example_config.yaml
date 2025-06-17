@@ -1,10 +1,11 @@
 region: <your-aws-region>
 
 knowledge_base_name: rag-kb
-database_name: rag-db-vs
+database_name: ragdb
 
-embeddings_model_id: amazon.titan-embed-text-v1
-bedrock_model_id: anthropic.claude-3-haiku-20240307-v1:0
+environment: dev # [dev, uat, prod]
+embeddings_model_id: amazon.titan-embed-text-v2:0
+bedrock_model_id: anthropic.claude-3-5-haiku-20241022-v1:0
 #bedrock_model_id: anthropic.claude-3-sonnet-20240229-v1:0
 
 chunking_strategy: HIERARCHICAL # HIERARCHICAL or FIXED_SIZE or SEMANTIC
@@ -25,4 +26,4 @@ semantic:
   breakpoint_percentile_threshold: 90
   buffer_size: 0
 
-bot_name: publichealthbot
+chat_welcome_prompt: "Hello! How can I help you today?"
