@@ -213,7 +213,7 @@ class LambdaAndLexBot(Construct):
                     "Effect": "Allow",
                     "Principal": {"Service": "connect.amazonaws.com"},
                     "Action": "lex:*",
-                    "Resource": f\"arn:aws:lex:{region}:[AWS_ACCOUNT_ID]:bot-alias/{lex_bot.ref}/TSTALIASID",
+                    "Resource": f"arn:aws:lex:{region}:{account_id}:bot-alias/{lex_bot.ref}/TSTALIASID",
                     "Condition": {
                         "StringEquals": {"aws:SourceAccount": f"{account_id}"},
                         "ArnLike": {
