@@ -1,3 +1,4 @@
+import uuid
 from string import Template
 
 from aws_cdk import (
@@ -53,7 +54,7 @@ class Connect(Construct):
                 outbound_calls=True,
             ),
             identity_management_type="CONNECT_MANAGED",
-            instance_alias=f"demoinstance-{stack_name}-{environment}",
+            instance_alias=f"demo-{stack_name}-{environment}-{uuid.uuid4().hex[:8]}",
         )
 
         # # Phone number
