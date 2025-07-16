@@ -107,6 +107,8 @@ Once document ingestion is complete, you can test the system in Amazon Connect.
 - If encountering throttling errors, try changing the chat model
 - Please reach out to the authors for further questions
 
+**Note:** The Database, DynamoDB Table, and S3 Bucket are set to DESTROY, so they will be deleted if the stack gets destroyed. To keep these in the event the stack gets destroyed, set RemovalPolicy to RETAIN.
+
 ## Cost
 | Component | 1K Messages | 10K Messages | 100K Messages |
 |-----------|------------|-------------|--------------|
