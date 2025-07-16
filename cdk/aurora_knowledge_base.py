@@ -195,7 +195,7 @@ class AuroraKnowledgeBase(Construct):
             credentials=rds.Credentials.from_secret(db_credentials),
             removal_policy=RemovalPolicy.DESTROY,
             serverless_v2_min_capacity=0.5,  # Minimum ACU
-            serverless_v2_max_capacity=1.0,  # Maximum ACU #TODO make configurable
+            serverless_v2_max_capacity=1.0,  # Maximum ACU
             enable_data_api=True,
         )
 

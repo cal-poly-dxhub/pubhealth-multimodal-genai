@@ -49,7 +49,7 @@ class LambdaAndLexBot(Construct):
                 name="SessionID_Lex", type=dynamodb.AttributeType.STRING
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=RemovalPolicy.DESTROY,  # TODO RETAIN
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Add inline policies for bedrock, dynamodb access
