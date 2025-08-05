@@ -1,0 +1,29 @@
+region: <your-aws-region>
+
+knowledge_base_name: rag-kb
+database_name: ragdb
+
+environment: dev # [dev, uat, prod]
+embeddings_model_id: amazon.titan-embed-text-v2:0
+bedrock_model_id: anthropic.claude-3-5-haiku-20241022-v1:0
+#bedrock_model_id: anthropic.claude-3-sonnet-20240229-v1:0
+
+chunking_strategy: HIERARCHICAL # HIERARCHICAL or FIXED_SIZE or SEMANTIC
+# Hierarchical configuration
+hierarchical:
+  overlap_tokens: 20
+  max_parent_tokens: 1500
+  max_child_tokens: 300
+
+# Fixed size configuration
+fixed_size:
+  max_tokens: 300
+  overlap_percentage: 20
+
+# Semantic configuration
+semantic:
+  max_tokens: 300
+  breakpoint_percentile_threshold: 90
+  buffer_size: 0
+
+chat_welcome_prompt: "Hello! How can I help you today?"
